@@ -17,6 +17,8 @@ jobs:
   check:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    env:
+      COMPOSE_FILE: compose.yaml:compose.ci.yaml
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -25,7 +27,13 @@ jobs:
         shell: bash
         run: |
           umask 077
-          printf 'POSTGRES_PASSWORD=%s\nMEILI_MASTER_KEY=%s\nBETTER_AUTH_SECRET=%s\nBETTER_AUTH_URL=http://localhost:3000\nGITHUB_CLIENT_ID=ci-test\nGITHUB_CLIENT_SECRET=ci-test\n' "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" > .env
+          : > .env
+          for key in POSTGRES_PASSWORD MEILI_MASTER_KEY BETTER_AUTH_SECRET; do
+            value=$(openssl rand -hex 32)
+            echo "::add-mask::$value"
+            printf '%s=%s\n' "$key" "$value" >> .env
+          done
+          printf 'BETTER_AUTH_URL=http://localhost:3000\nGITHUB_CLIENT_ID=ci-test\nGITHUB_CLIENT_SECRET=ci-test\n' >> .env
       - name: Check shell syntax and start test services
         run: |
           for file in scripts/ops/*.sh; do bash -n "$file"; done
@@ -41,6 +49,17 @@ jobs:
           docker compose exec -T web node --test tests/production-env.test.mjs
       - name: Verify production deployment and recovery
         run: bash scripts/check-production.sh
+      - name: Show test service diagnostics
+        if: failure()
+        run: |
+          docker compose ps --all || true
+          docker compose logs --no-color --tail=200 web postgres meilisearch || true
+          for service in web postgres meilisearch; do
+            container=$(docker compose ps --all --quiet "$service")
+            if [[ -n "$container" ]]; then
+              docker inspect --format '{{.Name}} {{json .State.Health}}' "$container" || true
+            fi
+          done
       - name: Clean up test services
         if: always()
         run: docker compose down --volumes --remove-orphans

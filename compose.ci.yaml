@@ -1,0 +1,13 @@
+name: blog-ci
+
+services:
+  web:
+    build:
+      target: ci
+    # Use the image's source and dependencies instead of the host checkout.
+    volumes: !reset []
+    ports: !reset []
+  postgres:
+    ports: !reset []
+  meilisearch:
+    ports: !reset []

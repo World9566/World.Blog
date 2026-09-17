@@ -87,6 +87,8 @@ docker compose exec web pnpm typecheck
 
 这一步验证生产构建。`Dockerfile.dev` 和 `compose.yaml` 用于本地开发；`Dockerfile` 和 `compose.prod.yaml` 用于正式部署，通过现有 Cloudflare Tunnel 接入 HTTPS。详见下方“生产部署”。
 
+GitHub Actions 叠加 `compose.ci.yaml`，使用 `Dockerfile.dev` 的 `ci` 阶段：构建时安装锁定依赖并将源码复制给容器内的 `node` 用户，运行时不挂载宿主机源码，也不开放测试服务端口。这避免 Linux runner 与容器用户 UID 不同导致生成文件失败。CI 使用临时测试凭据，失败时在清理前输出容器日志与健康检查记录。
+
 ## 数据与配置
 
 - `postgres_data` 和 `meili_data` 是独立命名卷，重建应用容器会保留服务数据。
@@ -227,6 +229,7 @@ scripts/                  内容生成、搜索同步与环境检查
 tests/                    内容、账号和社区输入边界测试
 .devcontainer/            VS Code 容器开发配置
 compose.yaml              本地服务编排
+compose.ci.yaml           CI 测试环境覆盖配置
 Dockerfile.dev            Node.js 开发环境
 compose.prod.yaml         生产服务编排
 Dockerfile                生产应用与维护镜像
