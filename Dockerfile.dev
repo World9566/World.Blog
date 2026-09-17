@@ -1,0 +1,20 @@
+FROM node:24-bookworm-slim@sha256:2fe369e969550cde8e867afc3fe370b260140cab4a23d467074295b42163d553
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates openssl git \
+    && rm -rf /var/lib/apt/lists/* \
+    && npm install --global pnpm@11.19.0
+
+ENV PNPM_HOME=/pnpm
+ENV PATH=/pnpm:$PATH
+ENV NEXT_TELEMETRY_DISABLED=1
+
+WORKDIR /app
+RUN mkdir -p /app/node_modules /app/.next /app/build /pnpm/store \
+    && chown -R node:node /app /pnpm
+
+USER node
+RUN pnpm config set store-dir /pnpm/store
+
+EXPOSE 3000
+CMD ["sh", "scripts/dev.sh"]

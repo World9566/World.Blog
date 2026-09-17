@@ -1,0 +1,50 @@
+worker_processes auto;
+pid /tmp/nginx.pid;
+error_log /dev/stderr warn;
+events { worker_connections 1024; }
+http {
+  include /etc/nginx/mime.types;
+  default_type application/octet-stream;
+  # Exclude query strings, cookies and OAuth codes from access logs.
+  log_format blog '$remote_addr $request_method $uri $status $body_bytes_sent';
+  access_log /dev/stdout blog;
+  server_tokens off;
+  client_body_temp_path /tmp/client_body;
+  proxy_temp_path /tmp/proxy;
+  fastcgi_temp_path /tmp/fastcgi;
+  uwsgi_temp_path /tmp/uwsgi;
+  scgi_temp_path /tmp/scgi;
+  client_max_body_size 16k;
+  client_body_timeout 15s;
+  send_timeout 30s;
+  resolver 127.0.0.11 valid=10s ipv6=off;
+  # The only host listener is loopback, reached by the existing cloudflared.
+  map $http_cf_connecting_ip $client_ip {
+    "" $remote_addr;
+    default $http_cf_connecting_ip;
+  }
+  server {
+    listen 8080;
+    server_name ${SITE_HOST};
+    add_header X-Content-Type-Options nosniff always;
+    add_header Referrer-Policy strict-origin-when-cross-origin always;
+    add_header X-Frame-Options SAMEORIGIN always;
+    location = /healthz { access_log off; return 200 'ok'; }
+    location / {
+      set $app web:3000;
+      proxy_pass http://$app;
+      proxy_http_version 1.1;
+      proxy_set_header Host ${SITE_HOST};
+      proxy_set_header X-Forwarded-Host ${SITE_HOST};
+      proxy_set_header X-Forwarded-Proto https;
+      proxy_set_header X-Real-IP $client_ip;
+      proxy_set_header X-Forwarded-For $client_ip;
+      proxy_set_header Forwarded "";
+      proxy_set_header CF-Connecting-IP "";
+      proxy_set_header Connection "";
+      proxy_buffering off;
+      proxy_read_timeout 60s;
+      proxy_redirect off;
+    }
+  }
+}

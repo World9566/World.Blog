@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily World Blog database backup
+
+[Timer]
+OnCalendar=*-*-* 04:30:00
+RandomizedDelaySec=900
+Persistent=true
+
+[Install]
+WantedBy=timers.target

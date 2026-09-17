@@ -1,0 +1,11 @@
+[Unit]
+Description=World Blog database backup
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/home/ubuntu/apps/world-blog
+ExecStart=/bin/bash scripts/ops/backup.sh
+UMask=0077

@@ -1,0 +1,63 @@
+---
+id: "post_typescript_unknown"
+slug: "typescript-unknown-and-narrowing"
+title: "从 unknown 开始，写清数据的边界"
+description: "面对接口返回的数据，先检查，再使用。让类型收窄成为可靠代码的第一步。"
+publishedAt: "2026-09-15"
+topic: "web"
+tags: ["TypeScript", "类型系统"]
+cover: "brackets"
+draft: false
+---
+
+接口返回的 JSON 看起来像一个用户对象，但“看起来像”还不足以让程序安全地使用它。网络边界外的数据，需要在运行时接受检查。
+
+## unknown 留住了检查的机会
+
+`unknown` 表示还不知道值的类型。使用它的属性之前，必须先收窄类型。这个约束会提醒我们：对外部数据的信任，需要有证据。
+
+```typescript
+type User = {
+  id: number;
+  name: string;
+};
+
+function isUser(value: unknown): value is User {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  return (
+    "id" in value && typeof value.id === "number" &&
+    "name" in value && typeof value.name === "string"
+  );
+}
+```
+
+## 把检查放在入口
+
+检查通过之后，业务代码就能清楚地使用 `User`。失败时，在数据入口给出明确的处理结果。
+
+```typescript
+function displayName(payload: unknown): string {
+  if (!isUser(payload)) {
+    return "用户信息暂不可用";
+  }
+
+  return payload.name;
+}
+```
+
+这个检查只验证示例中的字段类型。真实业务还可能要求名称不能为空、ID 必须是正整数，或对嵌套结构进行校验。
+
+## 类型断言不会检查数据
+
+写下 `payload as User`，只是告诉编译器按这个类型理解数据。它不会自动运行字段检查，也不会在返回结构变化时替我们拒绝错误值。
+
+<Callout title="让边界明确，内部才能简单">
+在接口、配置文件和用户输入的入口集中验证，能减少内部逻辑中反复猜测数据形状的代码。
+</Callout>
+
+## 延伸阅读
+
+- [TypeScript：类型收窄](https://www.typescriptlang.org/docs/handbook/2/narrowing.html)

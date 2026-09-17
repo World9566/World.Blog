@@ -1,0 +1,15 @@
+{
+  "name": "Blog development",
+  "dockerComposeFile": "../compose.yaml",
+  "service": "web",
+  "runServices": ["web", "postgres", "meilisearch"],
+  "workspaceFolder": "/app",
+  "remoteUser": "node",
+  "overrideCommand": false,
+  "shutdownAction": "none",
+  "customizations": {
+    "vscode": {
+      "extensions": ["unifiedjs.vscode-mdx", "Prisma.prisma"]
+    }
+  }
+}

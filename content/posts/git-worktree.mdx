@@ -1,0 +1,56 @@
+---
+id: "post_git_worktree"
+slug: "git-worktree-for-parallel-work"
+title: "用 Git worktree，让任务各有位置"
+description: "保留手头的修改，同时打开另一个分支。给临时修复和长期开发各留一张工作台。"
+publishedAt: "2026-09-15"
+topic: "engineering"
+tags: ["Git", "工作流"]
+cover: "branches"
+draft: false
+---
+
+写到一半的功能还没有完成，却需要临时处理另一个问题。此时可以为另一个分支建立独立的工作目录，让两个任务各自保留现场。
+
+## 一份仓库，多张工作台
+
+`git worktree` 让同一个 Git 仓库拥有多个工作目录。它们共享仓库的对象数据，各自维护检出的文件和索引。
+
+先查看已有的工作目录：
+
+```bash
+git worktree list
+```
+
+## 给新任务建立目录
+
+假设仓库中已有 `main` 分支，需要新建 `fix/header` 分支修复导航：
+
+```bash
+git worktree add -b fix/header ../project-header main
+```
+
+运行后，`../project-header` 就是一份可以独立打开的工作目录。原目录中的未提交修改仍留在原处。命令中的路径和分支名称需要根据实际项目调整。
+
+<Callout title="分支也需要各有位置">
+通常情况下，同一个分支不能同时被两个工作目录检出。让每个正在推进的任务使用自己的分支，更容易理解修改属于哪里。
+</Callout>
+
+## 依赖和端口也要安排好
+
+工作目录分开之后，运行环境仍需注意几件事：
+
+- 按锁文件安装每个目录需要的依赖。
+- 同时启动多个服务时，使用不同的宿主机端口。
+- 核对各自的环境变量，避免误连到同一份测试数据。
+- 提交前执行 `git status`，确认当前所在分支。
+
+## 完成后收好工作台
+
+先提交或妥善保存修改，再检查工作目录状态。确定不再需要目录后，可用 `git worktree remove` 移除它；这个动作和合并分支是两个独立步骤。
+
+为任务留出独立空间，最大的收益是切换时不必重新整理思路。回到原来的目录，文件和上下文都还在。
+
+## 延伸阅读
+
+- [Git：git-worktree 官方文档](https://git-scm.com/docs/git-worktree)

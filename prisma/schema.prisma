@@ -1,0 +1,174 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                String             @id
+  name              String
+  email             String             @unique
+  emailVerified     Boolean            @default(false)
+  image             String?
+  bio               String             @default("") @db.VarChar(500)
+  githubUsername    String?
+  role              String             @default("user")
+  banned            Boolean            @default(false)
+  banReason         String?
+  banExpires        DateTime?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  sessions          Session[]
+  accounts          Account[]
+  comments          Comment[]
+  articleLikes      ArticleLike[]
+  bookmarks         Bookmark[]
+  interactionLimits InteractionLimit[]
+  adminActions      AdminAudit[]
+
+  @@map("user")
+}
+
+model Session {
+  id             String   @id
+  token          String   @unique
+  expiresAt      DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  ipAddress      String?
+  userAgent      String?
+  impersonatedBy String?
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@unique([providerId, accountId])
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@index([expiresAt])
+  @@map("verification")
+}
+
+model RateLimit {
+  id          String @id
+  key         String @unique
+  count       Int
+  lastRequest BigInt
+
+  @@index([lastRequest])
+  @@map("rateLimit")
+}
+
+model Comment {
+  id         String        @id @default(uuid())
+  articleId  String
+  userId     String
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parentId   String?
+  parent     Comment?      @relation("Replies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies    Comment[]     @relation("Replies")
+  body       String        @db.VarChar(2000)
+  deletedAt  DateTime?
+  status     CommentStatus @default(PUBLISHED)
+  reviewedAt DateTime?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@index([articleId, parentId, createdAt, id])
+  @@index([userId, createdAt, id])
+  @@index([status, reviewedAt, createdAt, id])
+  @@map("comment")
+}
+
+enum CommentStatus {
+  PUBLISHED
+  HIDDEN
+}
+
+model AdminAudit {
+  id          String   @id @default(uuid())
+  actorId     String?
+  actor       User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  actorName   String
+  source      String
+  action      String
+  targetType  String
+  targetId    String
+  targetLabel String
+  reason      String   @db.VarChar(500)
+  before      Json
+  after       Json
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt, id])
+  @@index([actorId, createdAt])
+  @@index([targetType, targetId])
+  @@map("adminAudit")
+}
+
+model ArticleLike {
+  userId    String
+  articleId String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([userId, articleId])
+  @@index([articleId])
+  @@map("articleLike")
+}
+
+model Bookmark {
+  userId    String
+  articleId String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([userId, articleId])
+  @@index([userId, createdAt, articleId])
+  @@map("bookmark")
+}
+
+model InteractionLimit {
+  userId    String
+  action    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  startedAt DateTime
+  count     Int
+
+  @@id([userId, action])
+  @@map("interactionLimit")
+}

@@ -1,0 +1,74 @@
+---
+id: "post_docker_layers"
+slug: "docker-images-containers-and-volumes"
+title: "理解 Docker：镜像、容器与数据"
+description: "从三个基本概念出发，弄清应用如何运行，以及数据究竟保存在哪里。"
+publishedAt: "2026-09-15"
+topic: "engineering"
+tags: ["Docker", "容器", "数据持久化"]
+cover: "layers"
+featured: true
+draft: false
+---
+
+刚开始使用 Docker 时，很容易把应用、运行环境和数据想成同一个整体。把它们拆开看，许多问题就会变得清楚：为什么重建容器后文件不见了？为什么本地修改能立刻出现在容器中？数据库又应该放在哪里？
+
+## 先分清三个角色
+
+镜像描述运行应用所需的文件和环境。容器是镜像启动后的运行实例。数据卷则为需要长期保留的数据提供独立的存储位置。
+
+| 对象 | 负责什么 | 常见内容 |
+| --- | --- | --- |
+| 镜像 | 交付应用与运行环境 | 程序、依赖、启动命令 |
+| 容器 | 执行应用进程 | 进程、临时文件、运行状态 |
+| 数据卷 | 持久保存数据 | 数据库文件、上传文件 |
+
+可以把镜像看作一份准备好的运行材料。同一份镜像能够启动多个容器，它们分别拥有自己的运行状态。
+
+## 代码如何进入容器
+
+开发时常用绑定挂载，将宿主机目录映射到容器路径。下面的配置把当前目录挂到 `/app`：
+
+```yaml
+services:
+  web:
+    image: node:24-bookworm-slim
+    working_dir: /app
+    volumes:
+      - .:/app
+      - dependencies:/app/node_modules
+
+volumes:
+  dependencies:
+```
+
+本地编辑文件，容器能看到同一份修改。第二个挂载让 `/app/node_modules` 使用独立的数据卷，适合将容器中的依赖与宿主机环境分开管理。该示例只展示挂载关系，应用启动命令需要按项目补充。
+
+### 挂载会遮住原来的目录
+
+路径上已有的内容会被挂载内容遮住。如果发现镜像里明明有文件，启动后却看不到，先检查这个路径是否被其他目录或数据卷覆盖。
+
+## 让数据拥有独立的生命周期
+
+容器可以被替换，数据库中的文章评论却需要继续保留。将数据库的数据目录挂到命名卷后，应用更新和数据保存就有了各自的生命周期。
+
+<Callout title="持久化与备份，是两件事">
+数据卷帮助数据跨越容器重建而保留。它仍然可能受到磁盘故障或误操作影响，重要数据还需要独立备份，并验证能够恢复。
+</Callout>
+
+## 遇到问题，先看实际状态
+
+检查配置时，把注意力放在正在运行的实例上：
+
+```bash
+docker compose ps
+docker compose logs --tail=50 web
+docker inspect <container-name> --format '{{json .Mounts}}'
+```
+
+依次确认服务是否运行、启动日志是否报错、挂载源路径和目标路径是否符合预期。沿着这三步检查，往往比反复重启更容易找到原因。
+
+## 延伸阅读
+
+- [Docker：绑定挂载](https://docs.docker.com/engine/storage/bind-mounts/)
+- [Docker：数据卷](https://docs.docker.com/engine/storage/volumes/)
