@@ -35,7 +35,26 @@ if ! docker info >/dev/null 2>&1; then
   else echo "Docker is unavailable or requires permission." >&2; exit 1; fi
 fi
 host_path() { if command -v cygpath >/dev/null; then cygpath -m "$1"; else printf '%s' "$1"; fi; }
-dc() { MSYS_NO_PATHCONV=1 "${DOCKER[@]}" compose --env-file "$(host_path "$ENV_FILE")" --project-directory "$(host_path "$ROOT")" -f "$(host_path "$ROOT/compose.prod.yaml")" "$@"; }
+dc() {
+  local release_env result
+  # sudo may discard exported variables. Pass the selected release explicitly
+  # without forwarding secrets through sudo's environment or command arguments.
+  release_env=$(mktemp "$STATE_DIR/compose-release.XXXXXX.env") || return
+  if ! printf 'BLOG_RELEASE=%s\n' "$BLOG_RELEASE" > "$release_env"; then
+    rm -f -- "$release_env"
+    return 1
+  fi
+  if MSYS_NO_PATHCONV=1 "${DOCKER[@]}" compose \
+    --env-file "$(host_path "$ENV_FILE")" --env-file "$(host_path "$release_env")" \
+    --project-name "$COMPOSE_PROJECT_NAME" --project-directory "$(host_path "$ROOT")" \
+    -f "$(host_path "$ROOT/compose.prod.yaml")" "$@"; then
+    result=0
+  else
+    result=$?
+  fi
+  rm -f -- "$release_env"
+  return "$result"
+}
 sql() { dc exec -T postgres sh -c 'exec psql -X -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At' <<< "$1"; }
 schema_version() {
   local exists

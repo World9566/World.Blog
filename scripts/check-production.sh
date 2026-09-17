@@ -26,6 +26,24 @@ cleanup() {
   exit "$result"
 }
 trap cleanup EXIT
+# A sudo-based deployment loses shell variables. Both deploy and rollback must
+# still select the requested images instead of the version in the private file.
+(
+  DOCKER=(env -u BLOG_RELEASE -u COMPOSE_PROJECT_NAME "${DOCKER[@]}")
+  for selected in 1111111111111111111111111111111111111111 2222222222222222222222222222222222222222; do
+    export BLOG_RELEASE=$selected
+    images=$(dc --profile tools config --images)
+    printf '%s\n' "$images" | grep -Fxq "$BLOG_IMAGE:$selected"
+    printf '%s\n' "$images" | grep -Fxq "$BLOG_IMAGE:$selected-ops"
+  done
+  if dc config --invalid-compose-check >/dev/null 2>&1; then
+    echo 'Compose failure was not propagated.' >&2
+    exit 1
+  fi
+  leftovers=("$STATE_DIR"/compose-release.*.env)
+  [[ ! -e "${leftovers[0]}" ]]
+)
+echo 'Compose release selection survives cleared environment; failure cleanup passed.'
 "${DOCKER[@]}" build --target runner --build-arg SITE_URL="$SITE_URL" --build-arg REVISION="$revision" --tag "$BLOG_IMAGE:$revision" "$(host_path "$ROOT")"
 "${DOCKER[@]}" build --target ops --build-arg SITE_URL="$SITE_URL" --build-arg REVISION="$revision" --tag "$BLOG_IMAGE:$revision-ops" "$(host_path "$ROOT")"
 dc pull postgres meilisearch gateway
