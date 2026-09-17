@@ -37,6 +37,7 @@ jobs:
       - name: Check shell syntax and start test services
         run: |
           for file in scripts/ops/*.sh; do bash -n "$file"; done
+          node --test tests/runner-deploy.test.mjs
           docker compose up -d --build --wait --wait-timeout 300
       - name: Verify application
         run: |
@@ -124,31 +125,26 @@ jobs:
     needs: publish
     if: vars.DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 40
     environment: production
+    permissions:
+      contents: read
+      packages: read
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
-      - name: Deploy the checked commit
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Transfer images and deploy the checked commit
         env:
+          PUBLISHED_IMAGE: ${{ needs.publish.outputs.image }}
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
         shell: bash
-        run: |
-          set -euo pipefail
-          [[ "$DEPLOY_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]]
-          [[ "$DEPLOY_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]
-          [[ "$GITHUB_SHA" =~ ^[a-f0-9]{40}$ ]]
-          [[ -n "$DEPLOY_SSH_KEY" && -n "$DEPLOY_KNOWN_HOSTS" ]]
-          umask 077
-          key="$RUNNER_TEMP/blog-key"
-          hosts="$RUNNER_TEMP/blog-known-hosts"
-          trap 'rm -f "$key" "$hosts"' EXIT
-          printf '%s\n' "$DEPLOY_SSH_KEY" > "$key"
-          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$hosts"
-          # The archive has no .git, ignored credentials, backups or build output.
-          # The destination is a dedicated directory in the deployment user's home.
-          git archive "$GITHUB_SHA" | ssh -i "$key" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$hosts" -o ConnectTimeout=15 "$DEPLOY_USER@$DEPLOY_HOST" "set -eu; mkdir -p ~/apps/world-blog; cd ~/apps/world-blog; tar -xf -; bash scripts/ops/deploy.sh '$GITHUB_SHA'"
+        run: bash scripts/ops/deploy-from-runner.sh

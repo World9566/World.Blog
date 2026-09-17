@@ -37,6 +37,10 @@ fi
 host_path() { if command -v cygpath >/dev/null; then cygpath -m "$1"; else printf '%s' "$1"; fi; }
 dc() {
   local release_env result
+  # Offline releases must never fall back to a registry when an image is absent.
+  if [[ "${BLOG_SKIP_PULL:-0}" == 1 && ( "${1:-}" == up || "${1:-}" == run ) ]]; then
+    set -- "$1" --pull never "${@:2}"
+  fi
   # sudo may discard exported variables. Pass the selected release explicitly
   # without forwarding secrets through sudo's environment or command arguments.
   release_env=$(mktemp "$STATE_DIR/compose-release.XXXXXX.env") || return
