@@ -64,6 +64,30 @@ async function fingerprint(directory: string): Promise<string> {
 async function load(): Promise<void> {
   const configured = contentDirectory();
   try {
+    if (!process.env.CONTENT_DIR) {
+      // Without an explicit CONTENT_DIR the application repository simply
+      // carries no articles (they live in the content repository, cloned for
+      // local writing); serve an empty set and pick content up once the
+      // directory appears. An explicitly configured directory that is
+      // missing is a broken mount and must fail loudly below.
+      const present = await stat(configured)
+        .then(() => true)
+        .catch(() => false);
+      if (!present) {
+        state.snapshot = {
+          dir: "",
+          fingerprint: "",
+          articles: [],
+          published: [],
+          sources: new Map(),
+          components: new Map(),
+          compileErrors: new Map(),
+          loadedAt: Date.now(),
+        };
+        state.loadError = null;
+        return;
+      }
+    }
     const directory = await realpath(configured).catch(() => {
       // The most likely cause deserves an actionable hint.
       throw Object.assign(new Error(`Content directory is missing: ${configured}`), {

@@ -38,6 +38,20 @@ jobs:
         run: |
           for file in scripts/ops/*.sh; do bash -n "$file"; done
           docker compose up -d --build --wait --wait-timeout 300
+      - name: Warm application routes before type checks
+        # Finish the dev server's lazy route compilation before next typegen
+        # runs, so the two never write the generated route types concurrently.
+        run: |
+          docker compose exec -T web node -e '
+            (async () => {
+              const base = "http://127.0.0.1:3000";
+              const paths = ["/", "/articles", "/articles/ci-first-fixture", "/topics", "/topics/web", "/about", "/login", "/search", "/feed.xml", "/sitemap.xml"];
+              for (const path of paths) {
+                const response = await fetch(base + path);
+                await response.text();
+              }
+            })().catch((error) => { console.error(error); process.exit(1); });
+          '
       - name: Verify application
         run: |
           docker compose exec -T web pnpm test

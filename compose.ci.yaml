@@ -4,8 +4,10 @@ services:
   web:
     build:
       target: ci
-    # Use the image's source and dependencies instead of the host checkout.
-    volumes: !reset []
+    # Use the image's source and dependencies instead of the host checkout;
+    # fixture articles stand in for the content repository during checks.
+    volumes:
+      - ./tests/fixtures/posts:/app/content/posts:ro
     ports: !reset []
   postgres:
     ports: !reset []
