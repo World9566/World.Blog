@@ -26,6 +26,7 @@ credentials*.json
 id_rsa*
 id_ed25519*
 src/generated
+content
 build-info.json
 node_modules
 .next

@@ -18,6 +18,7 @@ revision=${GITHUB_SHA:-0000000000000000000000000000000000000001}
   command -v cygpath >/dev/null && content_root=$(cygpath -m "$content_root")
   printf 'CONTENT_ROOT=%s\nCONTENT_REFRESH_TOKEN=%s\n' "$content_root" "$(openssl rand -hex 32)"
 } > "$BLOG_ENV_FILE"
+content_repo=""
 source scripts/ops/common.sh
 cleanup() {
   result=$?
@@ -26,7 +27,7 @@ cleanup() {
   if [[ "$COMPOSE_PROJECT_NAME" == "$project" && "$project" == world-blog-ci-* ]]; then
     dc down --volumes --remove-orphans || true
     rm -f -- "$BLOG_ENV_FILE"
-    rm -rf -- "$ROOT/tmp/content-$project"
+    rm -rf -- "$ROOT/tmp/content-$project" "$content_repo"
   fi
   exit "$result"
 }
@@ -55,6 +56,26 @@ dc pull postgres meilisearch gateway
 BLOG_SKIP_PULL=1 bash scripts/ops/deploy.sh "$revision"
 dc run -T --rm --no-deps ops node --input-type=module < scripts/check-production.mjs
 dc run --rm --no-deps -e CHECK_BASE_URL=http://gateway:8080 ops pnpm content:check
+
+# Publish one article through the bundle pipeline: a throwaway repository
+# stands in for the content repository, its object database travels as a git
+# bundle over stdin, and the release materializes as a worktree checkout.
+# This is the exact path the content repository workflow uses in production.
+content_repo=$(mktemp -d "$ROOT/tmp/content-repo.XXXXXX")
+git init --quiet "$content_repo"
+mkdir -- "$content_repo/posts"
+printf -- '%s
+'   '---'   'id: "post_bundle_check"'   'slug: "bundle-check"'   'title: "Bundle release check"'   'description: "Verifies the worktree delivery path."'   'publishedAt: "2026-01-01"'   'topic: "engineering"'   'tags: ["Test"]'   'cover: "layers"'   'draft: false'   '---'   ''   '## Published through a bundle'   ''   'This release was materialized by git worktree.'   > "$content_repo/posts/bundle-check.mdx"
+git -C "$content_repo" add posts
+git -C "$content_repo" -c user.name=ci -c user.email=ci@example.invalid commit --quiet -m "content: bundle check"
+content_sha=$(git -C "$content_repo" rev-parse HEAD)
+git -C "$content_repo" bundle create "$ROOT/tmp/content.bundle" HEAD >/dev/null
+bash scripts/ops/content-deploy.sh "$content_sha" < "$ROOT/tmp/content.bundle"
+rm -f -- "$ROOT/tmp/content.bundle"
+[[ "$(readlink "$CONTENT_RELEASES_DIR/current")" == "$content_sha" ]]
+[[ -f "$CONTENT_RELEASES_DIR/$content_sha/posts/bundle-check.mdx" ]]
+dc run --rm --no-deps -e CHECK_BASE_URL=http://gateway:8080 -e "CONTENT_DIR=/content/$content_sha/posts" ops pnpm content:check
+echo 'Content bundle delivery and worktree release checks passed.'
 sql "CREATE TABLE recovery_probe (id integer PRIMARY KEY, value text NOT NULL); INSERT INTO recovery_probe VALUES (1, 'backup-roundtrip');"
 backup=$(bash scripts/ops/backup.sh)
 cmp -s "$ENV_FILE" "$backup.env"

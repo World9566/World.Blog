@@ -32,10 +32,14 @@ CONTENT_STATE_DIR=""
 [[ -z "$CONTENT_ROOT" ]] || {
   CONTENT_RELEASES_DIR="$CONTENT_ROOT/releases"
   CONTENT_STATE_DIR="$CONTENT_ROOT/state"
-  mkdir -p "$CONTENT_RELEASES_DIR" "$CONTENT_STATE_DIR"
+  CONTENT_CACHE_DIR="$CONTENT_ROOT/cache"
+  mkdir -p "$CONTENT_RELEASES_DIR" "$CONTENT_STATE_DIR" "$CONTENT_CACHE_DIR"
   # The web and ops containers traverse this mount as uid 1000 (node), which
   # need not match the deployment user; umask 077 would lock them out.
   chmod 755 "$CONTENT_RELEASES_DIR"
+  # Compiled-article cache entries are written by that same uid from inside
+  # the containers, so the directory itself must be world-writable.
+  chmod 1777 "$CONTENT_CACHE_DIR"
 }
 [[ "${POSTGRES_PASSWORD:-}" =~ ^[a-fA-F0-9]{64}$ ]] || { echo "POSTGRES_PASSWORD must contain 64 hexadecimal characters." >&2; exit 1; }
 [[ "${POSTGRES_USER:-blog}" =~ ^[a-z][a-z0-9_]*$ && "${POSTGRES_DB:-blog}" =~ ^[a-z][a-z0-9_]*$ ]] || { echo "Invalid database name or user." >&2; exit 1; }

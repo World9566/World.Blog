@@ -16,6 +16,8 @@ build-info.json
 /docs/
 /DESIGN.md
 AGENTS.md
+# Articles live in the content repository; this is a local development clone
+/content/
 .agents/
 .codex/
 .vscode/

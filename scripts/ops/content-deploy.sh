@@ -1,23 +1,25 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-# Publishes articles without rebuilding the application image. A release is a
-# copy of content/posts materialized under CONTENT_ROOT/releases/<sha>, gated
-# by a full validation+compile check, then switched live with an atomic
-# symlink swap. The symlinks are the source of truth; state files are audit.
+# Publishes articles without rebuilding the application image. Articles live
+# in their own repository; a release is a git worktree of that repository
+# checked out under CONTENT_ROOT/releases/<sha>, gated by a full
+# validation+compile check, then switched live with an atomic symlink swap.
+# The object database travels as a git bundle piped to this script over SSH,
+# so the server never talks to GitHub. The symlinks are the source of truth;
+# state files are audit.
 #
 # Usage:
-#   content-deploy.sh <sha>               full deploy (refresh + live check)
-#   content-deploy.sh <sha> --bootstrap   before the web service starts
-#   content-deploy.sh --validate-current  revalidate the live release (rollback)
-bootstrap=0
-validate_only=0
-if [[ ${1:-} == --validate-current ]]; then
-  validate_only=1
+#   content-deploy.sh <sha>       full deploy; the bundle arrives on stdin
+#   content-deploy.sh --ensure    app deploy support: revalidate the live
+#                                 release, or bootstrap an empty one
+command -v git >/dev/null || { echo 'git is required on the host.' >&2; exit 1; }
+ensure_mode=0
+if [[ ${1:-} == --ensure ]]; then
+  ensure_mode=1
   shift
 else
-  [[ ${1:-} =~ ^[a-f0-9]{40}$ ]] || { echo 'Usage: content-deploy.sh <40-character commit SHA> [--bootstrap|--validate-current]' >&2; exit 1; }
-  if [[ ${2:-} == --bootstrap ]]; then bootstrap=1; fi
-  [[ ${2:-} == "" || ${2:-} == --bootstrap ]] || { echo 'Unknown option.' >&2; exit 1; }
+  [[ ${1:-} =~ ^[a-f0-9]{40}$ ]] || { echo 'Usage: content-deploy.sh <40-character content SHA> | --ensure' >&2; exit 1; }
+  [[ ${2:-} == "" ]] || { echo 'Unknown option.' >&2; exit 1; }
 fi
 source "$(dirname -- "${BASH_SOURCE[0]}")/common.sh"
 [[ -n "$CONTENT_RELEASES_DIR" && -n "$CONTENT_STATE_DIR" ]] || { echo 'CONTENT_ROOT is required in .env.production.' >&2; exit 1; }
@@ -25,7 +27,9 @@ source "$(dirname -- "${BASH_SOURCE[0]}")/common.sh"
 if [[ "${BLOG_OPERATION_LOCK_HELD:-0}" != 1 ]]; then lock_operation; fi
 RELEASES=$CONTENT_RELEASES_DIR
 STATE=$CONTENT_STATE_DIR
+REPO="$CONTENT_ROOT/repo"
 JOURNAL="$STATE/in-progress"
+rm -f -- "$STATE"/bundle.* 2>/dev/null || true
 index_name=''
 
 release_ready() {
@@ -77,21 +81,45 @@ recover_interrupted() {
   fi
 }
 
+# Fetch the bundle piped to stdin into the object database. The first run
+# initializes the repository from the bundle itself.
+import_bundle() {
+  local sha=$1 bundle
+  bundle="$STATE/bundle.$$"
+  cat > "$bundle"
+  if [[ ! -d "$REPO" ]]; then
+    git init --quiet "$REPO"
+  fi
+  if ! git -C "$REPO" fetch --quiet "$bundle" "$sha"; then
+    rm -f -- "$bundle"
+    echo "The transferred bundle does not contain $sha." >&2
+    exit 1
+  fi
+  rm -f -- "$bundle"
+}
+
+# Releases are worktrees of the object database, so materialization is a
+# checkout, not a copy. A directory without a valid marker is debris from an
+# interrupted run and is removed before re-adding.
 materialize() {
-  local sha=$1 release keep
+  local sha=$1 release
   release="$RELEASES/$sha"
   if release_ready "$release"; then
+    cat > /dev/null
     echo "Reusing validated release $sha (app $BLOG_RELEASE)."
     return 0
   fi
-  keep="$release.rebuild.$$"
-  rm -rf -- "$release" "$keep"
-  mkdir -p -- "$keep"
-  cp -a -- "$ROOT/content/posts" "$keep/posts"
-  # Copies keep the extraction's restrictive modes and owner; the containers
-  # read releases as uid 1000 (node), so publish explicit read access.
-  chmod -R a+rX -- "$keep"
-  mv -Tf -- "$keep" "$release"
+  import_bundle "$sha"
+  git -C "$REPO" worktree remove --force "$release" 2>/dev/null || rm -rf -- "$release"
+  git -C "$REPO" worktree prune
+  if ! git -C "$REPO" worktree add --quiet --detach "$release" "$sha"; then
+    rm -rf -- "$release"
+    echo "Worktree checkout failed for $sha." >&2
+    exit 1
+  fi
+  # Worktree files carry the deploying user's ownership and modes; the
+  # containers read releases as uid 1000 (node), so publish read access.
+  chmod -R a+rX -- "$release"
 }
 
 release_check() {
@@ -100,7 +128,7 @@ release_check() {
   if release_ready "$release"; then return 0; fi
   echo "Validating release $sha with the running application image..." >&2
   if ! dc run --rm --no-deps -e "CONTENT_DIR=/content/$sha/posts" ops pnpm content:release-check; then
-    rm -rf -- "$release"
+    git -C "$REPO" worktree remove --force "$release" 2>/dev/null || rm -rf -- "$release"
     echo 'Content release check failed. The live site was not touched.' >&2
     exit 1
   fi
@@ -204,43 +232,71 @@ prune_releases() {
       printf '%s %s\n' "$(stat -c %Y -- "$d")" "$d"
     done | sort -rn | cut -d' ' -f2-
   )
-  for d in "${sorted[@]:3}"; do rm -rf -- "$d"; done
+  for d in "${sorted[@]:3}"; do
+    git -C "$REPO" worktree remove --force "$d" 2>/dev/null || rm -rf -- "$d"
+  done
+  [[ -d "$REPO" ]] && git -C "$REPO" worktree prune
+}
+
+# Cache entries are keyed by application revision; superseded revisions can
+# never be read again and are dropped. The cost of pruning too eagerly is a
+# bounded recompile, so this runs on every content and application deploy.
+prune_cache() {
+  local dir name
+  [[ -n "${CONTENT_CACHE_DIR:-}" && -d "$CONTENT_CACHE_DIR" ]] || return 0
+  for dir in "$CONTENT_CACHE_DIR"/*/; do
+    [[ -d "$dir" ]] || continue
+    name=$(basename -- "$dir")
+    [[ "$name" == "$BLOG_RELEASE" ]] || rm -rf -- "$dir"
+  done
 }
 
 recover_interrupted
 
-if [[ "$validate_only" == 1 ]]; then
+if [[ "$ensure_mode" == 1 ]]; then
   target=$(current_release)
-  [[ "$target" =~ ^[a-f0-9]{40}$ ]] || { echo 'No content release is currently live.' >&2; exit 1; }
+  if [[ -z "$target" || "$target" == "empty" ]]; then
+    # First application deploy on a fresh server: publish an empty release so
+    # the site is healthy before the content repository delivers articles.
+    if [[ ! -d "$RELEASES/empty/posts" ]]; then
+      mkdir -p -- "$RELEASES/empty/posts"
+      chmod -R a+rX -- "$RELEASES/empty"
+    fi
+    write_ready "$RELEASES/empty"
+    switch_release empty
+    # A fresh stack has no search index; create an empty one so checks that
+    # expect the index have it.
+    dc run --rm --no-deps ops pnpm search:sync
+    record_state
+    echo 'No content release found; an empty release was published.'
+    exit 0
+  fi
   release_check "$target"
+  prune_cache
   echo "Content release $target is valid under app $BLOG_RELEASE."
   exit 0
 fi
 
 sha=$1
-[[ -d "$ROOT/content/posts" ]] || { echo 'Missing content/posts in the application checkout.' >&2; exit 1; }
 materialize "$sha"
 release_check "$sha"
 prepare_search "$sha"
 
 journal_write "$sha" "$index_name"
 switch_release "$sha"
-if [[ "$bootstrap" == 0 ]]; then
-  if ! refresh_web; then
-    echo 'Web refresh failed. Rolling back the content switch.' >&2
-    rollback_release
-    exit 1
-  fi
+if ! refresh_web; then
+  echo 'Web refresh failed. Rolling back the content switch.' >&2
+  rollback_release
+  exit 1
 fi
 swap_search
 journal_update_swapped "$index_name"
-if [[ "$bootstrap" == 0 ]]; then
-  if ! live_check "$sha"; then
-    echo 'Live check failed. Rolling back content and search together.' >&2
-    rollback_release
-    exit 1
-  fi
+if ! live_check "$sha"; then
+  echo 'Live check failed. Rolling back content and search together.' >&2
+  rollback_release
+  exit 1
 fi
 record_state
 prune_releases
+prune_cache
 echo "Content deployed: $sha (app $BLOG_RELEASE, index $index_name)."

@@ -14,6 +14,8 @@ x-app-environment: &app-environment
   # Articles are read at runtime from the release directory mounted below;
   # the current symlink is switched atomically by content deploys.
   CONTENT_DIR: /content/current/posts
+  # Compiled MDX is cached on disk keyed by source hash and APP_REVISION.
+  CONTENT_COMPILE_CACHE: /app/.content-cache
   CONTENT_REFRESH_TOKEN: ${CONTENT_REFRESH_TOKEN:?Set CONTENT_REFRESH_TOKEN}
   DATABASE_URL: postgresql://${POSTGRES_USER:-blog}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-blog}
   MEILI_HOST: http://meilisearch:7700
@@ -36,6 +38,8 @@ services:
       # source once, so atomic switches would be invisible. Through the
       # parent, current is resolved on every access.
       - ${CONTENT_ROOT:?Set CONTENT_ROOT}/releases:/content:ro
+      # A writable bind mount is valid inside a read-only root filesystem.
+      - ${CONTENT_ROOT:?Set CONTENT_ROOT}/cache:/app/.content-cache
     read_only: true
     tmpfs:
       - /tmp:uid=1000,gid=1000,mode=1777
@@ -143,6 +147,7 @@ services:
     environment: *app-environment
     volumes:
       - ${CONTENT_ROOT:?Set CONTENT_ROOT}/releases:/content:ro
+      - ${CONTENT_ROOT:?Set CONTENT_ROOT}/cache:/app/.content-cache
     networks: [backend]
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]

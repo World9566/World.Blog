@@ -6,13 +6,20 @@ import { validateContent } from "./content";
 import { syncSearch } from "./search-sync";
 
 async function fingerprint() {
-  const hash = createHash("sha256");
-  for (const name of (await readdir("content/posts"))
-    .filter((name) => name.endsWith(".mdx"))
-    .sort()) {
-    hash.update(name).update(await readFile(`content/posts/${name}`));
+  try {
+    const hash = createHash("sha256");
+    for (const name of (await readdir("content/posts"))
+      .filter((name) => name.endsWith(".mdx"))
+      .sort()) {
+      hash.update(name).update(await readFile(`content/posts/${name}`));
+    }
+    return hash.digest("hex");
+  } catch (error) {
+    // A missing content clone must not kill the dev server; clone the content
+    // repository into content/ to write articles locally.
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return "";
+    throw error;
   }
-  return hash.digest("hex");
 }
 
 async function main() {

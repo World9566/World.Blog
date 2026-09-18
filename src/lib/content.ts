@@ -64,7 +64,12 @@ async function fingerprint(directory: string): Promise<string> {
 async function load(): Promise<void> {
   const configured = contentDirectory();
   try {
-    const directory = await realpath(configured);
+    const directory = await realpath(configured).catch(() => {
+      // The most likely cause deserves an actionable hint.
+      throw Object.assign(new Error(`Content directory is missing: ${configured}`), {
+        hint: "Content is a separate repository; clone it (e.g. into content/) or fix the CONTENT_DIR mount.",
+      });
+    });
     const published = await collectArticles(directory);
     const sources = new Map<string, string>();
     await Promise.all(

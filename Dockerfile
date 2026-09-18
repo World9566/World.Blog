@@ -30,7 +30,6 @@ COPY --from=build --chown=node:node /app/prisma ./prisma
 COPY --from=build --chown=node:node /app/prisma.config.ts /app/tsconfig.json /app/build-info.json ./
 COPY --from=build --chown=node:node /app/scripts ./scripts
 COPY --from=build --chown=node:node /app/src ./src
-COPY --from=build --chown=node:node /app/content ./content
 USER node
 CMD ["pnpm", "db:deploy"]
 

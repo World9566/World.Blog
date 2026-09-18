@@ -2,9 +2,8 @@ import "dotenv/config";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { collectArticles } from "../src/lib/content-source";
 import { compileArticleSource } from "../src/lib/mdx-compile";
-import { contentDirectory } from "./content";
+import { contentDirectory, validateContent } from "./content";
 
 // The authoritative gate before a content release goes live: metadata
 // validation plus a full MDX compile of every article, using the same compile
@@ -12,7 +11,7 @@ import { contentDirectory } from "./content";
 // cannot fail at render time.
 async function main() {
   const directory = contentDirectory();
-  const articles = await collectArticles(directory);
+  const articles = await validateContent();
   const failures: string[] = [];
   for (const article of articles) {
     try {
