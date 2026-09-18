@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 ROOT=$(cd -- "$(dirname -- "$0")/../.." && pwd)
-[[ $# == 2 ]] || { echo 'Usage: bash scripts/ops/init-env.sh https://blog.example.com ghcr.io/owner/repository' >&2; exit 1; }
+[[ $# == 2 ]] || { echo 'Usage: bash scripts/ops/init-env.sh https://blog.example.com ghcr.nju.edu.cn/owner/repository' >&2; exit 1; }
 [[ "$1" =~ ^https://[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ && "$2" =~ ^[a-z0-9][a-z0-9./_-]*$ ]] || { echo 'Use a canonical HTTPS origin and a lowercase image repository.' >&2; exit 1; }
 [[ ! -e "$ROOT/.env.production" ]] || { echo 'Existing .env.production preserved.'; exit 0; }
 command -v openssl >/dev/null
