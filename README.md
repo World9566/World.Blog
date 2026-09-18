@@ -264,10 +264,10 @@ git push -u origin main
 2. 在服务器私有 `.env.production` 中填写生产 GitHub OAuth 凭据。生产 OAuth App 的 Homepage URL 为 `https://www.world9566.online`，回调为 `https://www.world9566.online/api/auth/callback/github`。其余密钥由初始化脚本生成，不要用开发密钥覆盖。
 3. 在 GitHub 仓库配置变量 `SITE_URL=https://www.world9566.online`。推送 `main` 后，检查通过才会构建并发布 GHCR 镜像。域名参与静态页面构建，换域名需要重建镜像。
 4. 在 GitHub 创建 `production` environment，并配置 `DEPLOY_HOST`、`DEPLOY_USER`、`DEPLOY_SSH_KEY`、`DEPLOY_KNOWN_HOSTS` 四个 Secrets。主机填写 Actions 能访问的 IPv4 或主机名，SSH 使用 22 端口；known_hosts 内容应通过可信连接核验。
-5. 服务器需要能够以部署账号运行 Docker，或已有 `sudo -n docker` 权限。服务器统一经南大公益加速源 `ghcr.nju.edu.cn` 拉取镜像；私有 GHCR 包使用仅有 `read:packages` 权限的凭据执行 `sudo docker login ghcr.nju.edu.cn`，如果该账号直接访问 Docker，则用同一账号登录。
+5. 服务器需要能够以部署账号运行 Docker，或已有 `sudo -n docker` 权限。镜像包须在 GitHub 的 Package settings 中设为 Public：加速源只匿名代理公开镜像，公开后服务器经南大公益加速源 `ghcr.nju.edu.cn` 拉取，无需登录。
 6. 准备就绪后设置仓库变量 `DEPLOY_ENABLED=true`，后续 main 提交会自动传输部署文件并发布。该变量未启用时只检查和发布镜像。
 
-基础服务的固定版本也会复制到同一 GHCR 包，生产服务器可以只连接加速源。CI 仍将镜像发布到 `ghcr.io`；服务器拉取时把镜像仓库域名中的 `ghcr.io` 替换为南大公益加速源 `ghcr.nju.edu.cn` 即可。手动发布和检查：
+基础服务的固定版本也会复制到同一 GHCR 包，生产服务器可以只连接加速源。CI 仍将镜像发布到 `ghcr.io`；服务器拉取时把镜像仓库域名中的 `ghcr.io` 替换为南大公益加速源 `ghcr.nju.edu.cn` 即可（该源仅匿名代理公开镜像，无需 docker login）。手动发布和检查：
 
 ```bash
 bash scripts/ops/deploy.sh <完整40位提交SHA>
