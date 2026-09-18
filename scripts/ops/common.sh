@@ -4,13 +4,16 @@ export PATH="/usr/bin:/bin:$PATH"
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 ENV_FILE=${BLOG_ENV_FILE:-"$ROOT/.env.production"}
 [[ -f "$ENV_FILE" ]] || { echo "Missing .env.production. Run scripts/ops/init-env.sh first." >&2; exit 1; }
+# A caller such as deploy.sh exports the release it is switching to; remember
+# it before the environment file parsing overwrites the variable.
+inherited_release=${BLOG_RELEASE:-}
 # Parse simple KEY=value records without executing the configuration as shell code.
 while IFS= read -r line || [[ -n "$line" ]]; do
   line=${line%$'\r'}
   [[ -z "$line" || "$line" == \#* ]] && continue
   key=${line%%=*}; value=${line#*=}
   case "$key" in
-    COMPOSE_PROJECT_NAME|SITE_URL|SITE_HOST|ORIGIN_PORT|BLOG_IMAGE|BLOG_RELEASE|GATEWAY_IMAGE|POSTGRES_IMAGE|MEILI_IMAGE|POSTGRES_USER|POSTGRES_DB|POSTGRES_PASSWORD|MEILI_MASTER_KEY|BETTER_AUTH_SECRET|GITHUB_CLIENT_ID|GITHUB_CLIENT_SECRET) export "$key=$value" ;;
+    COMPOSE_PROJECT_NAME|SITE_URL|SITE_HOST|ORIGIN_PORT|BLOG_IMAGE|BLOG_RELEASE|GATEWAY_IMAGE|POSTGRES_IMAGE|MEILI_IMAGE|POSTGRES_USER|POSTGRES_DB|POSTGRES_PASSWORD|MEILI_MASTER_KEY|BETTER_AUTH_SECRET|GITHUB_CLIENT_ID|GITHUB_CLIENT_SECRET|CONTENT_ROOT|CONTENT_REFRESH_TOKEN) export "$key=$value" ;;
     *) echo "Unexpected setting name in production environment." >&2; exit 1 ;;
   esac
 done < "$ENV_FILE"
@@ -18,13 +21,25 @@ done < "$ENV_FILE"
 [[ "$COMPOSE_PROJECT_NAME" =~ ^[a-z][a-z0-9-]{0,39}$ && "$COMPOSE_PROJECT_NAME" != blog-dev ]] || { echo "Invalid production project name." >&2; exit 1; }
 [[ "${SITE_HOST:-}" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ && "${SITE_URL:-}" == "https://$SITE_HOST" ]] || { echo "SITE_HOST must match the HTTPS SITE_URL." >&2; exit 1; }
 [[ "${BLOG_IMAGE:-}" =~ ^[a-z0-9][a-z0-9./_-]*$ ]] || { echo "Invalid image repository." >&2; exit 1; }
+# The content release directory lives outside the application directory so an
+# application archive extraction can never overwrite a mounted release.
+CONTENT_ROOT=${CONTENT_ROOT:-}
+[[ -z "$CONTENT_ROOT" || "$CONTENT_ROOT" =~ ^(/|[A-Za-z]:/)([a-zA-Z0-9._-]+/)*[a-zA-Z0-9._-]+$ ]] || { echo "CONTENT_ROOT must be an absolute directory path." >&2; exit 1; }
+CONTENT_REFRESH_TOKEN=${CONTENT_REFRESH_TOKEN:-}
+[[ -z "$CONTENT_REFRESH_TOKEN" || "$CONTENT_REFRESH_TOKEN" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "CONTENT_REFRESH_TOKEN has an invalid format." >&2; exit 1; }
+CONTENT_RELEASES_DIR=""
+CONTENT_STATE_DIR=""
+[[ -z "$CONTENT_ROOT" ]] || { CONTENT_RELEASES_DIR="$CONTENT_ROOT/releases"; CONTENT_STATE_DIR="$CONTENT_ROOT/state"; mkdir -p "$CONTENT_RELEASES_DIR" "$CONTENT_STATE_DIR"; }
 [[ "${POSTGRES_PASSWORD:-}" =~ ^[a-fA-F0-9]{64}$ ]] || { echo "POSTGRES_PASSWORD must contain 64 hexadecimal characters." >&2; exit 1; }
 [[ "${POSTGRES_USER:-blog}" =~ ^[a-z][a-z0-9_]*$ && "${POSTGRES_DB:-blog}" =~ ^[a-z][a-z0-9_]*$ ]] || { echo "Invalid database name or user." >&2; exit 1; }
 STATE_DIR="$ROOT/.deploy/$COMPOSE_PROJECT_NAME"
 BACKUP_DIR="$ROOT/backups/$COMPOSE_PROJECT_NAME"
 umask 077
 mkdir -p "$STATE_DIR" "$BACKUP_DIR"
-if [[ -f "$STATE_DIR/current-release" ]]; then
+if [[ "$inherited_release" =~ ^[a-f0-9]{40}$ ]]; then
+  # Nested scripts must select the caller's release, not the recorded one.
+  export BLOG_RELEASE=$inherited_release
+elif [[ -f "$STATE_DIR/current-release" ]]; then
   BLOG_RELEASE=$(cat "$STATE_DIR/current-release")
   [[ "$BLOG_RELEASE" =~ ^[a-f0-9]{40}$ ]] || { echo "Invalid release state." >&2; exit 1; }
   export BLOG_RELEASE

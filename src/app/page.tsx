@@ -1,11 +1,13 @@
 import Link from "next/link";
-import { articles } from "@/lib/content";
+import { getArticles } from "@/lib/content";
 import { topics, getTopic } from "@/lib/site";
 import { ArticleArt } from "@/components/article-art";
 import { ArticleCard } from "@/components/article-card";
 import { Icon } from "@/components/icon";
 
-export default function Home() {
+export const dynamic = "force-dynamic";
+export default async function Home() {
+  const articles = await getArticles();
   const featured = articles.find((article) => article.featured) || articles[0];
   const latest = articles
     .filter((article) => article.id !== featured?.id)

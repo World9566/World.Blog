@@ -6,7 +6,7 @@ import { db } from "../src/lib/db";
 import { auth } from "../src/lib/auth";
 import { authOrigin } from "../src/lib/auth-config";
 import { changeUserAccess } from "../src/lib/admin";
-import { publishedArticles } from "../src/lib/published-articles";
+import { getArticles } from "../src/lib/content";
 
 async function main() {
   const base = process.env.CHECK_BASE_URL || "http://127.0.0.1:3000";
@@ -20,7 +20,7 @@ async function main() {
   const cookies: string[] = [];
   const sessionIds: string[] = [];
   const context = await auth.$context;
-  const article = publishedArticles[0];
+  const article = (await getArticles())[0];
   assert.ok(article);
   const path = `/api/articles/${article.id}`;
   const baselineAdmins = await prisma.user.count({

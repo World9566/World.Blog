@@ -13,6 +13,10 @@ revision=${GITHUB_SHA:-0000000000000000000000000000000000000001}
 {
   printf 'COMPOSE_PROJECT_NAME=%s\nSITE_URL=https://blog.example.invalid\nSITE_HOST=blog.example.invalid\nORIGIN_PORT=18081\nBLOG_IMAGE=%s\nBLOG_RELEASE=%s\n' "$project" "$project" "$revision"
   printf 'POSTGRES_USER=blog\nPOSTGRES_DB=blog\nPOSTGRES_PASSWORD=%s\nMEILI_MASTER_KEY=%s\nBETTER_AUTH_SECRET=%s\nGITHUB_CLIENT_ID=rehearsal\nGITHUB_CLIENT_SECRET=rehearsal\n' "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" "$(openssl rand -hex 32)"
+  # A Windows checkout needs the drive-letter form for compose bind mounts.
+  content_root="$ROOT/tmp/content-$project"
+  command -v cygpath >/dev/null && content_root=$(cygpath -m "$content_root")
+  printf 'CONTENT_ROOT=%s\nCONTENT_REFRESH_TOKEN=%s\n' "$content_root" "$(openssl rand -hex 32)"
 } > "$BLOG_ENV_FILE"
 source scripts/ops/common.sh
 cleanup() {
@@ -22,6 +26,7 @@ cleanup() {
   if [[ "$COMPOSE_PROJECT_NAME" == "$project" && "$project" == world-blog-ci-* ]]; then
     dc down --volumes --remove-orphans || true
     rm -f -- "$BLOG_ENV_FILE"
+    rm -rf -- "$ROOT/tmp/content-$project"
   fi
   exit "$result"
 }

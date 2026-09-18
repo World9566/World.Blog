@@ -3,7 +3,7 @@ import {
   readAccountBody,
   accountError,
 } from "@/lib/account-request";
-import { publishedArticle } from "@/lib/published-articles";
+import { publishedArticle } from "@/lib/content";
 import { isCommentId } from "@/lib/community-policy";
 import {
   communityResponse,

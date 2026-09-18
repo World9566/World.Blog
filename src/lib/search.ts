@@ -1,5 +1,5 @@
 import "server-only";
-import { articles } from "./content";
+import { getArticles } from "./content";
 import type { Article } from "./article-types";
 
 export function excerpt(article: Article, query: string) {
@@ -9,7 +9,7 @@ export function excerpt(article: Article, query: string) {
   return `${start > 0 ? "…" : ""}${article.text.slice(start, start + 150)}${article.text.length > start + 150 ? "…" : ""}`;
 }
 
-function localSearch(query: string, topic?: string) {
+function localSearch(articles: Article[], query: string, topic?: string) {
   const terms = query
     .normalize("NFKC")
     .toLocaleLowerCase()
@@ -45,6 +45,7 @@ export async function searchArticles(
   topic?: string,
 ): Promise<{ articles: Article[]; source: "meilisearch" | "local" }> {
   if (!query.trim()) return { articles: [], source: "local" };
+  const articles = await getArticles();
   try {
     if (!process.env.MEILI_HOST || !process.env.MEILI_MASTER_KEY)
       throw new Error("Search unavailable");
@@ -78,6 +79,6 @@ export async function searchArticles(
       source: "meilisearch",
     };
   } catch {
-    return { articles: localSearch(query, topic), source: "local" };
+    return { articles: localSearch(articles, query, topic), source: "local" };
   }
 }

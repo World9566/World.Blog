@@ -1,13 +1,15 @@
 import "dotenv/config";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
 
 const base = process.env.CHECK_BASE_URL || "http://127.0.0.1:3000";
+// The expected article set comes from validating the content directory with
+// the same rules the runtime loader applies, not from any build-time output.
 const articles = JSON.parse(
-  await readFile(
-    new URL("../src/generated/articles.json", import.meta.url),
-    "utf8",
-  ),
+  execFileSync("pnpm", ["exec", "tsx", "scripts/content.ts", "--json"], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "inherit"],
+  }),
 );
 const visible = (html) =>
   html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "");

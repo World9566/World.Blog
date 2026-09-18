@@ -14,7 +14,41 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  changes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      content-only: ${{ steps.filter.outputs.content-only }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+          # The range needs the previous head, which may be any commit.
+          fetch-depth: 0
+      - id: filter
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.event.after }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          content_only=false
+          if [[ "$EVENT_NAME" == "push" && "$BEFORE" =~ ^[a-f0-9]{40}$ && "$AFTER" =~ ^[a-f0-9]{40}$ ]]; then
+            git fetch --no-tags origin "$BEFORE" >/dev/null 2>&1 || true
+            if files=$(git diff --name-only "$BEFORE" "$AFTER") && [[ -n "$files" ]]; then
+              if grep -qv '^content/' <<< "$files"; then
+                content_only=false
+              else
+                content_only=true
+              fi
+            fi
+          fi
+          echo "content-only=$content_only" >> "$GITHUB_OUTPUT"
+
   check:
+    needs: changes
+    if: needs.changes.outputs.content-only != 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
@@ -63,6 +97,36 @@ jobs:
       - name: Clean up test services
         if: always()
         run: docker compose down --volumes --remove-orphans
+
+  content-check:
+    needs: changes
+    if: needs.changes.outputs.content-only == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      COMPOSE_FILE: compose.yaml:compose.ci.yaml
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Create isolated test configuration
+        shell: bash
+        run: |
+          umask 077
+          : > .env
+          for key in POSTGRES_PASSWORD MEILI_MASTER_KEY BETTER_AUTH_SECRET; do
+            value=$(openssl rand -hex 32)
+            echo "::add-mask::$value"
+            printf '%s=%s\n' "$key" "$value" >> .env
+          done
+          printf 'BETTER_AUTH_URL=http://localhost:3000\nGITHUB_CLIENT_ID=ci-test\nGITHUB_CLIENT_SECRET=ci-test\n' >> .env
+      - name: Validate and compile the article release
+        run: |
+          docker compose build web
+          docker compose run --rm --no-deps web sh -c 'pnpm content:validate && pnpm content:release-check'
+      - name: Clean up test services
+        if: always()
+        run: docker compose down --volumes --remove-orphans || true
 
   publish:
     needs: check
@@ -152,3 +216,36 @@ jobs:
           # The archive has no .git, ignored credentials, backups or build output.
           # The destination is a dedicated directory in the deployment user's home.
           git archive "$GITHUB_SHA" | ssh -i "$key" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$hosts" -o ConnectTimeout=15 "$DEPLOY_USER@$DEPLOY_HOST" "set -eu; mkdir -p ~/apps/world-blog; cd ~/apps/world-blog; tar -xf -; bash scripts/ops/deploy.sh '$GITHUB_SHA'"
+
+  deploy-content:
+    needs: [changes, content-check]
+    if: needs.changes.outputs.content-only == 'true' && vars.DEPLOY_ENABLED == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Deploy the article release without rebuilding images
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$DEPLOY_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]]
+          [[ "$DEPLOY_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]
+          [[ "$GITHUB_SHA" =~ ^[a-f0-9]{40}$ ]]
+          [[ -n "$DEPLOY_SSH_KEY" && -n "$DEPLOY_KNOWN_HOSTS" ]]
+          umask 077
+          key="$RUNNER_TEMP/blog-key"
+          hosts="$RUNNER_TEMP/blog-known-hosts"
+          trap 'rm -f "$key" "$hosts"' EXIT
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$key"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$hosts"
+          # Same archive transfer as a code deploy: the checkout tree on the
+          # server provides both the article files and the deploy scripts.
+          git archive "$GITHUB_SHA" | ssh -i "$key" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$hosts" -o ConnectTimeout=15 "$DEPLOY_USER@$DEPLOY_HOST" "set -eu; mkdir -p ~/apps/world-blog; cd ~/apps/world-blog; tar -xf -; bash scripts/ops/content-deploy.sh '$GITHUB_SHA'"

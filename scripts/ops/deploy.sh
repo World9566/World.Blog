@@ -38,7 +38,9 @@ migration_safe=0
 dc run --rm --no-deps ops pnpm db:deploy
 after=$(schema_version)
 [[ "$before" != "$after" ]] || migration_safe=1
-dc run --rm --no-deps ops pnpm search:sync
+# Materialize and validate the article release for this commit, switch the
+# content symlink and swap the search index before the web service starts.
+bash "$ROOT/scripts/ops/content-deploy.sh" "$target" --bootstrap
 dc up -d --no-deps --wait --wait-timeout 120 web
 dc up -d --no-deps --force-recreate --wait --wait-timeout 60 gateway
 dc exec -T gateway wget -q -O /dev/null http://127.0.0.1:8080/api/health

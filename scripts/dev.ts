@@ -2,7 +2,7 @@ import "dotenv/config";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
-import { generateContent } from "./content";
+import { validateContent } from "./content";
 import { syncSearch } from "./search-sync";
 
 async function fingerprint() {
@@ -20,7 +20,7 @@ async function main() {
   let retrySearch = false;
   let busy = false;
   async function rebuild() {
-    const articles = await generateContent();
+    const articles = await validateContent();
     try {
       await syncSearch(articles);
       retrySearch = false;

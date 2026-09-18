@@ -1,50 +1,37 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { collectArticles } from "../src/lib/content-source";
+import { collectArticles, type SourceArticle } from "../src/lib/content-source";
 
-async function writeChanged(filename: string, value: string) {
-  try {
-    if ((await readFile(filename, "utf8")) === value) return;
-  } catch {}
-  await writeFile(filename, value);
+export function contentDirectory(): string {
+  return (
+    process.env.CONTENT_DIR ||
+    path.join(process.cwd(), "content", "posts")
+  );
 }
 
-export async function generateContent() {
-  const articles = await collectArticles(
-    path.join(process.cwd(), "content/posts"),
-  );
-  const directory = path.join(process.cwd(), "src/generated");
-  await mkdir(directory, { recursive: true });
-  await writeChanged(
-    path.join(directory, "articles.json"),
-    JSON.stringify(
-      articles.map(({ filename, draft, ...article }) => article),
-      null,
-      2,
-    ) + "\n",
-  );
-  const loaders = articles
-    .map(
-      (article) =>
-        `  ${JSON.stringify(article.slug)}: () => import(${JSON.stringify(`../../content/posts/${article.filename}`)}),`,
-    )
-    .join("\n");
-  await writeChanged(
-    path.join(directory, "article-loaders.ts"),
-    `// Generated from published MDX. Do not edit.\nimport type { ComponentType } from "react";\nexport const articleLoaders: Record<string, () => Promise<{ default: ComponentType }>> = {\n${loaders}\n};\n`,
-  );
-  return articles;
+// Validates every article in the content directory. This is the shared gate
+// for CI, the production build and the runtime content loader; a failure here
+// must always stop a release before it reaches readers.
+export function validateContent(): Promise<SourceArticle[]> {
+  return collectArticles(contentDirectory());
 }
 
 if (
   process.argv[1] &&
   import.meta.url === pathToFileURL(process.argv[1]).href
 ) {
-  generateContent()
-    .then((articles) =>
-      console.log(`Validated ${articles.length} published articles.`),
-    )
+  validateContent()
+    .then((articles) => {
+      if (process.argv.includes("--json")) {
+        console.log(
+          JSON.stringify(
+            articles.map(({ filename, draft, ...article }) => article),
+          ),
+        );
+      } else {
+        console.log(`Validated ${articles.length} published articles.`);
+      }
+    })
     .catch((error) => {
       console.error(error.message);
       process.exitCode = 1;

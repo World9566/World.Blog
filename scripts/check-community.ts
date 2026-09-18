@@ -5,7 +5,7 @@ import { prisma } from "../src/lib/prisma";
 import { db } from "../src/lib/db";
 import { auth } from "../src/lib/auth";
 import { authOrigin } from "../src/lib/auth-config";
-import { publishedArticles } from "../src/lib/published-articles";
+import { getArticles } from "../src/lib/content";
 import { COMMENT_PAGE_SIZE } from "../src/lib/community-policy";
 
 async function main() {
@@ -14,7 +14,7 @@ async function main() {
     throw new Error(
       "Community checks only run against a local development server.",
     );
-  const [article, second] = publishedArticles;
+  const [article, second] = await getArticles();
   assert.ok(article && second, "At least two published articles are needed.");
   const path = `/api/articles/${encodeURIComponent(article.id)}`;
   const secondPath = `/api/articles/${encodeURIComponent(second.id)}`;

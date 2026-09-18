@@ -195,25 +195,24 @@ draft: true
 ```
 
 - `id` 是文章的永久标识，应保持稳定；`slug` 决定 `/articles/slug` 链接，发布后修改会改变网址。
-- `draft` 必须显式填写。只有 `draft: false` 且发布日期不晚于北京时间当天的文章会进入构建、搜索和 RSS。未来日期需要在到期后重新构建，当前不提供定时发布服务。
+- `draft` 必须显式填写。只有 `draft: false` 且发布日期不晚于北京时间当天的文章会进入页面、搜索和 RSS。日期到期的未来文章会在次日自动出现，无需重新发布。
 - 日期必须加引号。修改文章时可添加 `updatedAt: "2026-09-16"`，不能早于发布日期。
 - 专题选 `engineering`、`web` 或 `fundamentals`；封面图形选 `layers`、`branches`、`brackets` 或 `search`。
 - 页面提供一级标题，正文使用 `##` 和 `###` 自动生成目录；支持 GFM 表格、列表及代码围栏。
 - MDX 可以执行代码，只允许可信站长在内容仓库中编写。访客评论采用独立的纯文本输入与渲染方式。
 - 随项目提供的 4 篇文章是起始内容，可编辑、删除或设为草稿。
 
-开发服务在启动和文章变更时自动同步 Meilisearch；搜索服务暂时不可用时，页面会改用当前已发布内容进行本地匹配。站点只在服务端访问搜索密钥。索引通过临时索引构建后整体交换，删除或转为草稿的文章会从新索引中移除。
+文章不在构建时编译进镜像，而是由运行中的应用从内容目录实时读取并缓存。开发服务在启动和文章变更时自动同步 Meilisearch；搜索服务暂时不可用时，页面会改用当前已发布内容进行本地匹配。站点只在服务端访问搜索密钥。索引通过临时索引构建后整体交换，删除或转为草稿的文章会从新索引中移除。
 
-可手动执行以下命令。生产发布脚本在迁移后、启动新应用前执行搜索同步：
+可手动执行以下命令。校验失败会阻止生产构建与内容发布；搜索同步包含构建临时索引和整体交换两个阶段，发布脚本会把两阶段拆开，夹在内容切换前后：
 
 ```powershell
-docker compose exec web pnpm content:generate
+docker compose exec web pnpm content:validate
+docker compose exec web pnpm content:release-check
 docker compose exec web pnpm search:sync
 ```
 
-`pnpm content:check` 会对正在运行的站点进行公开路由、搜索、输入处理、RSS、站点地图和索引一致性检查。修改文章后，等待开发服务完成热编译与搜索同步再执行。
-
-`src/generated/` 是自动生成且被 Git 忽略的文件，不应手动修改。内容校验失败会阻止生产构建。
+`pnpm content:check` 会对正在运行的站点进行公开路由、搜索、输入处理、RSS、站点地图和索引一致性检查，期望结果来自对内容目录的实时校验。修改文章后，等待开发服务完成热编译与搜索同步再执行。`pnpm content:release-check` 额外对每篇文章执行完整 MDX 编译，是内容发布前的权威检查。
 
 ## 文件布局
 
@@ -221,11 +220,10 @@ docker compose exec web pnpm search:sync
 content/posts/            MDX 文章
 src/app/                  页面、RSS、站点地图与健康接口
 src/components/           导航、文章卡片、目录与阅读交互
-src/lib/                  内容校验、搜索、站点配置与数据库连接
-src/generated/            自动生成的已发布内容和 MDX 加载表
+src/lib/                  内容运行时加载、MDX 编译、搜索与站点配置
 src/mdx-components.tsx     MDX 组件入口
 prisma/                   Prisma schema 与数据库迁移
-scripts/                  内容生成、搜索同步与环境检查
+scripts/                  内容校验、搜索同步、发布与环境检查
 tests/                    内容、账号和社区输入边界测试
 .devcontainer/            VS Code 容器开发配置
 compose.yaml              本地服务编排
@@ -252,7 +250,7 @@ git push -u origin main
 
 ## 生产部署
 
-公开域名为 `https://www.world9566.online`。宿主机 cloudflared 将该域名转发到 `http://localhost:8080`，Compose 的入口仅绑定 `127.0.0.1:8080`。应用、PostgreSQL 与 Meilisearch 不发布宿主机端口。生产应用运行构建后的镜像，不挂载整个源码目录。
+公开域名为 `https://www.world9566.online`。宿主机 cloudflared 将该域名转发到 `http://localhost:8080`，Compose 的入口仅绑定 `127.0.0.1:8080`。应用、PostgreSQL 与 Meilisearch 不发布宿主机端口。生产应用运行构建后的镜像，不挂载整个源码目录；文章不打包进镜像，而是由应用从 `~/apps/world-blog-content/releases` 只读挂载的内容目录实时读取。
 
 1. 将部署文件放入服务器部署用户的 `~/apps/world-blog`。提供的 Docker 安装脚本适用于 Ubuntu 22.04，已有 Docker 时仅检查版本。
 
@@ -261,8 +259,9 @@ git push -u origin main
    bash scripts/ops/init-env.sh https://www.world9566.online ghcr.nju.edu.cn/你的账号/你的仓库
    ```
 
+   初始化脚本会创建同级的 `~/apps/world-blog-content`（内容发布目录）并写入 `CONTENT_ROOT` 和 `CONTENT_REFRESH_TOKEN`。该目录在应用目录之外，应用归档解压不会覆盖它。
 2. 在服务器私有 `.env.production` 中填写生产 GitHub OAuth 凭据。生产 OAuth App 的 Homepage URL 为 `https://www.world9566.online`，回调为 `https://www.world9566.online/api/auth/callback/github`。其余密钥由初始化脚本生成，不要用开发密钥覆盖。
-3. 在 GitHub 仓库配置变量 `SITE_URL=https://www.world9566.online`。推送 `main` 后，检查通过才会构建并发布 GHCR 镜像。域名参与静态页面构建，换域名需要重建镜像。
+3. 在 GitHub 仓库配置变量 `SITE_URL=https://www.world9566.online`。推送 `main` 后，检查通过才会构建并发布 GHCR 镜像。域名参与应用构建，换域名需要重建镜像。
 4. 在 GitHub 创建 `production` environment，并配置 `DEPLOY_HOST`、`DEPLOY_USER`、`DEPLOY_SSH_KEY`、`DEPLOY_KNOWN_HOSTS` 四个 Secrets。主机填写 Actions 能访问的 IPv4 或主机名，SSH 使用 22 端口；known_hosts 内容应通过可信连接核验。
 5. 服务器需要能够以部署账号运行 Docker，或已有 `sudo -n docker` 权限。镜像包须在 GitHub 的 Package settings 中设为 Public：加速源只匿名代理公开镜像，公开后服务器经南大公益加速源 `ghcr.nju.edu.cn` 拉取，无需登录。
 6. 准备就绪后设置仓库变量 `DEPLOY_ENABLED=true`，后续 main 提交会自动传输部署文件并发布。该变量未启用时只检查和发布镜像。
@@ -274,7 +273,13 @@ bash scripts/ops/deploy.sh <完整40位提交SHA>
 curl --fail http://127.0.0.1:8080/api/health
 ```
 
-发布会短暂停止入口和应用，先备份，再执行数据库迁移、同步搜索并检查健康状态。相同迁移版本下可通过 `bash scripts/ops/rollback.sh` 回退上一应用；新增或失败的迁移需要人工恢复或修复，不能只回退应用镜像。
+发布会短暂停止入口和应用，先备份，再执行数据库迁移、发布文章内容并检查健康状态。相同迁移版本下可通过 `bash scripts/ops/rollback.sh` 回退上一应用；新增或失败的迁移需要人工恢复或修复，不能只回退应用镜像。
+
+### 发布文章
+
+只改 `content/` 下文件的 main 推送走独立的快速通道：跳过镜像构建与完整检查，只做内容校验和全量编译，然后通过 SSH 在服务器上执行 `bash scripts/ops/content-deploy.sh <完整40位提交SHA>`。整个过程不停站、不迁移数据库、不重建镜像，通常在一分钟内完成；混合改动仍走完整发布流程，代码发布会顺带把该提交的文章内容发布到位。
+
+内容发布的过程：把该提交的 `content/posts` 固化为 `releases/<SHA>` 目录，用当前应用镜像做完整编译校验，构建搜索临时索引，全部通过后原子切换 `current` 符号链接并通知应用热刷新，再交换搜索索引、对真实站点做冒烟检查。校验或索引失败时站点保持原状；切换后的失败会连同搜索索引一起回滚。历史内容版本保留在 `releases/` 中（当前、上一版本与最近 3 个），回滚内容即用旧 SHA 重新执行发布脚本。中断的发布会留下 journal，下次执行时自动恢复或清理。
 
 运维命令通过 `common.sh` 加载私有配置和当前成功版本：
 

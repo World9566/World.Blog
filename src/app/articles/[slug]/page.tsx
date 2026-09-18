@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { articles, findArticle, loadArticle } from "@/lib/content";
+import { getArticles, findArticle, getArticleComponent } from "@/lib/content";
+import { mdxComponentMap } from "@/mdx-components";
 import { formatDate, getSiteUrl, getTopic, site } from "@/lib/site";
 import { CopyButton } from "@/components/copy-button";
 import { TableOfContents } from "@/components/table-of-contents";
@@ -10,16 +11,13 @@ import { ArticleCard } from "@/components/article-card";
 import { Icon } from "@/components/icon";
 import { ArticleCommunity } from "@/components/article-community";
 
-export const dynamicParams = false;
-export function generateStaticParams() {
-  return articles.map(({ slug }) => ({ slug }));
-}
+export const dynamic = "force-dynamic";
 export async function generateMetadata({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
-  const article = findArticle((await params).slug);
+  const article = await findArticle((await params).slug);
   if (!article) return {};
   return {
     title: article.title,
@@ -42,11 +40,11 @@ export default async function ArticlePage({
 }: {
   params: Promise<{ slug: string }>;
 }) {
-  const article = findArticle((await params).slug);
+  const article = await findArticle((await params).slug);
   if (!article) notFound();
-  const loaded = await loadArticle(article.slug);
-  if (!loaded) notFound();
-  const Content = loaded.default;
+  const Content = await getArticleComponent(article.slug);
+  if (!Content) notFound();
+  const articles = await getArticles();
   const related = articles
     .filter((item) => item.id !== article.id)
     .sort(
@@ -111,7 +109,7 @@ export default async function ArticlePage({
           <TableOfContents headings={article.headings} />
         </aside>
         <article className="article-prose">
-          <Content />
+          <Content components={mdxComponentMap} />
           <div className="article-ending">
             <div className="article-tags">
               {article.tags.map((tag) => (

@@ -3,7 +3,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "./prisma";
 import { isBanned } from "./account-policy";
 import { accountError, privateHeaders } from "./account-request";
-import { publishedArticles } from "./published-articles";
+import { getArticles } from "./content";
 import { publicComment, publicThread } from "./comment-visibility";
 import {
   ACTIVITY_PAGE_SIZE,
@@ -200,6 +200,7 @@ export async function accountActivity(
   kind: "bookmarks" | "comments",
   page: number,
 ) {
+  const publishedArticles = await getArticles();
   const articleId = { in: publishedArticles.map((article) => article.id) };
   const options = {
     skip: (page - 1) * ACTIVITY_PAGE_SIZE,

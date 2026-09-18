@@ -11,6 +11,10 @@ x-app-environment: &app-environment
   NEXT_TELEMETRY_DISABLED: "1"
   SITE_URL: ${SITE_URL:?Set SITE_URL in .env.production}
   BETTER_AUTH_URL: ${SITE_URL:?Set SITE_URL in .env.production}
+  # Articles are read at runtime from the release directory mounted below;
+  # the current symlink is switched atomically by content deploys.
+  CONTENT_DIR: /content/current/posts
+  CONTENT_REFRESH_TOKEN: ${CONTENT_REFRESH_TOKEN:?Set CONTENT_REFRESH_TOKEN}
   DATABASE_URL: postgresql://${POSTGRES_USER:-blog}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-blog}
   MEILI_HOST: http://meilisearch:7700
   MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:?Set MEILI_MASTER_KEY}
@@ -26,6 +30,12 @@ services:
     restart: unless-stopped
     init: true
     environment: *app-environment
+    volumes:
+      # Mount the releases directory (the parent of the current symlink),
+      # never the current symlink itself: Docker resolves a symlink mount
+      # source once, so atomic switches would be invisible. Through the
+      # parent, current is resolved on every access.
+      - ${CONTENT_ROOT:?Set CONTENT_ROOT}/releases:/content:ro
     read_only: true
     tmpfs:
       - /tmp:uid=1000,gid=1000,mode=1777
@@ -131,6 +141,8 @@ services:
     profiles: [tools]
     init: true
     environment: *app-environment
+    volumes:
+      - ${CONTENT_ROOT:?Set CONTENT_ROOT}/releases:/content:ro
     networks: [backend]
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]

@@ -1,9 +1,12 @@
 import { db } from "@/lib/db";
+import { contentStatus, getArticles } from "@/lib/content";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  await getArticles();
+  const content = contentStatus();
   const checks = await Promise.allSettled([
     db.query("SELECT 1"),
     (async () => {
@@ -26,10 +29,24 @@ export async function GET() {
     postgres: checks[0].status === "fulfilled" ? "ok" : "unavailable",
     meilisearch: checks[1].status === "fulfilled" ? "ok" : "unavailable",
   };
-  const healthy = Object.values(services).every((status) => status === "ok");
+  // An article set that failed to load with no known-good snapshot to fall
+  // back to means the content mount or the release itself is broken; a stale
+  // snapshot after a later failure is degraded but still serving.
+  const contentHealthy = !content.loadError || content.articles > 0;
+  const healthy =
+    Object.values(services).every((status) => status === "ok") &&
+    contentHealthy;
 
   return Response.json(
-    { status: healthy ? "ok" : "degraded", services },
+    {
+      status: healthy ? "ok" : "degraded",
+      services,
+      content: {
+        status: contentHealthy ? "ok" : "unavailable",
+        articles: content.articles,
+        ...(content.loadError ? { error: content.loadError } : {}),
+      },
+    },
     { status: healthy ? 200 : 503, headers: { "Cache-Control": "no-store" } },
   );
 }

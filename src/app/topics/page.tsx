@@ -1,15 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { articles } from "@/lib/content";
+import { getArticles } from "@/lib/content";
 import { topics } from "@/lib/site";
 import { Icon } from "@/components/icon";
 
+export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "专题",
   description: "沿着工程实践、Web 开发和计算机基础，发现感兴趣的文章。",
   alternates: { canonical: "/topics" },
 };
-export default function TopicsPage() {
+export default async function TopicsPage() {
+  const articles = await getArticles();
   return (
     <main id="main-content">
       <section className="page-heading container">

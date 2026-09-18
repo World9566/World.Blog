@@ -2,13 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { articlesInTopic } from "@/lib/content";
-import { getTopic, topics } from "@/lib/site";
+import { getTopic } from "@/lib/site";
 import { ArticleCard } from "@/components/article-card";
 
-export const dynamicParams = false;
-export function generateStaticParams() {
-  return topics.map(({ slug }) => ({ slug }));
-}
+export const dynamic = "force-dynamic";
 export async function generateMetadata({
   params,
 }: {
@@ -30,7 +27,7 @@ export default async function TopicPage({
 }) {
   const topic = getTopic((await params).slug);
   if (!topic) notFound();
-  const articles = articlesInTopic(topic.slug);
+  const articles = await articlesInTopic(topic.slug);
   return (
     <main id="main-content">
       <section className="page-heading container">

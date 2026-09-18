@@ -5,7 +5,7 @@ import { readSession } from "./session";
 import { authorizeAccountRequest } from "./account-request";
 import { isBanned } from "./account-policy";
 import { CommunityError } from "./community";
-import { publishedArticles } from "./published-articles";
+import { getArticles } from "./content";
 import {
   ADMIN_PAGE_SIZE,
   type AdminAction,
@@ -171,8 +171,7 @@ export async function moderateComment(
 ) {
   return adminMutation(actor, async (tx, actorName) => {
     if (!action.startsWith("comment."))
-      throw new CommunityError(400, "评论操作不正确。");
-    await tx.$queryRaw`SELECT id FROM "comment" WHERE id = ${targetId} FOR UPDATE`;
+      throw new CommunityError(400, "评论操作不正确。");    await tx.$queryRaw`SELECT id FROM "comment" WHERE id = ${targetId} FOR UPDATE`;
     const target = await tx.comment.findUnique({ where: { id: targetId } });
     if (!target) throw new CommunityError(404, "评论不存在。");
     if (target.deletedAt)
@@ -213,7 +212,7 @@ export async function moderateComment(
       reviewed: true,
       deleted: action === "comment.delete",
     };
-    const article = publishedArticles.find(
+    const article = (await getArticles()).find(
       (item) => item.id === target.articleId,
     );
     await tx.adminAudit.create({
@@ -327,6 +326,7 @@ export async function listAdminUsers(query: AdminQuery, viewer: string) {
 }
 
 export async function listAdminComments(query: AdminQuery) {
+  const publishedArticles = await getArticles();
   const where: Prisma.CommentWhereInput = {
     AND: [
       ...(query.q

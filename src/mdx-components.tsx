@@ -38,6 +38,10 @@ const components: MDXComponents = {
   ),
 };
 
+// Exported for the runtime MDX pipeline, which passes the map explicitly to
+// the evaluated article component.
+export const mdxComponentMap: MDXComponents = components;
+
 export function useMDXComponents(): MDXComponents {
   return components;
 }

@@ -12,5 +12,8 @@ set -o noclobber
   printf 'COMPOSE_PROJECT_NAME=world-blog\nSITE_URL=%s\nSITE_HOST=%s\nORIGIN_PORT=8080\nBLOG_IMAGE=%s\nBLOG_RELEASE=not-deployed\n' "$1" "${1#https://}" "$2"
   printf 'GATEWAY_IMAGE=%s:nginx-1.28.2-alpine\nPOSTGRES_IMAGE=%s:postgres-18.6-bookworm\nMEILI_IMAGE=%s:meilisearch-1.53.2\n' "$2" "$2" "$2"
   printf 'POSTGRES_USER=blog\nPOSTGRES_DB=blog\nPOSTGRES_PASSWORD=%s\nMEILI_MASTER_KEY=%s\nBETTER_AUTH_SECRET=%s\nGITHUB_CLIENT_ID=\nGITHUB_CLIENT_SECRET=\n' "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" "$(openssl rand -hex 32)"
+  # Content releases live in a sibling directory, outside the application tree.
+  printf 'CONTENT_ROOT=%s\nCONTENT_REFRESH_TOKEN=%s\n' "$(dirname -- "$ROOT")/world-blog-content" "$(openssl rand -hex 32)"
 } > "$ROOT/.env.production"
+mkdir -p "$(dirname -- "$ROOT")/world-blog-content/releases" "$(dirname -- "$ROOT")/world-blog-content/state"
 echo 'Created private production environment. Add production GitHub OAuth credentials before deployment.'

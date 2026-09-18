@@ -12,6 +12,9 @@ dc run --rm --no-deps ops node scripts/ops/check-env.mjs
 expected=$(dc run --rm --no-deps ops node scripts/ops/migration-count.mjs)
 actual=$(schema_version)
 [[ "$expected" == "$actual" ]] || { echo 'Database migrations differ from the previous image. Automatic rollback is blocked; use the recovery guide.' >&2; exit 1; }
+# The live content release was validated by the newer application image;
+# revalidate it under the rolled-back image before continuing.
+bash scripts/ops/content-deploy.sh --validate-current
 dc stop gateway web
 dc run --rm --no-deps ops pnpm search:sync
 dc up -d --no-deps --wait --wait-timeout 120 web

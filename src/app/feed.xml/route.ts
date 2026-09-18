@@ -1,6 +1,6 @@
-import { articles } from "@/lib/content";
+import { getArticles } from "@/lib/content";
 import { site, getSiteUrl } from "@/lib/site";
-export const dynamic = "force-static";
+export const dynamic = "force-dynamic";
 const xml = (value: string) =>
   value.replace(
     /[<>&"']/g,
@@ -13,9 +13,9 @@ const xml = (value: string) =>
         "'": "&apos;",
       })[character]!,
   );
-export function GET() {
+export async function GET() {
   const base = getSiteUrl();
-  const items = articles
+  const items = (await getArticles())
     .map(
       (article) =>
         `<item><title>${xml(article.title)}</title><link>${xml(new URL(`/articles/${article.slug}`, base).href)}</link><guid isPermaLink="false">${xml(article.id)}</guid><description>${xml(article.description)}</description><pubDate>${new Date(`${article.publishedAt}T00:00:00+08:00`).toUTCString()}</pubDate></item>`,

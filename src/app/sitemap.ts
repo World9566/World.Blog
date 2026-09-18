@@ -1,8 +1,10 @@
 import type { MetadataRoute } from "next";
-import { articles } from "@/lib/content";
+import { getArticles } from "@/lib/content";
 import { getSiteUrl, topics } from "@/lib/site";
-export default function sitemap(): MetadataRoute.Sitemap {
+export const dynamic = "force-dynamic";
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = getSiteUrl();
+  const articles = await getArticles();
   return [
     ...[
       "/",

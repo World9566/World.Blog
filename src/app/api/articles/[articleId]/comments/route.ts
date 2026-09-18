@@ -4,7 +4,7 @@ import {
   accountError,
 } from "@/lib/account-request";
 import { readSession } from "@/lib/session";
-import { publishedArticle } from "@/lib/published-articles";
+import { publishedArticle } from "@/lib/content";
 import { isCommentId, parseComment } from "@/lib/community-policy";
 import {
   communityResponse,
@@ -21,7 +21,7 @@ type Context = { params: Promise<{ articleId: string }> };
 export async function GET(request: Request, context: Context) {
   return communityResponse(async () => {
     const { articleId } = await context.params;
-    if (!publishedArticle(articleId))
+    if (!(await publishedArticle(articleId)))
       return accountError("文章暂不可用。", 404);
     const params = new URL(request.url).searchParams;
     const parentId = params.get("parentId"),
@@ -41,7 +41,7 @@ export async function GET(request: Request, context: Context) {
 export async function POST(request: Request, context: Context) {
   return communityResponse(async () => {
     const { articleId } = await context.params;
-    if (!publishedArticle(articleId))
+    if (!(await publishedArticle(articleId)))
       return accountError("文章暂不可用。", 404);
     const authorization = await authorizeAccountRequest(request);
     if (authorization.error) return authorization.error;

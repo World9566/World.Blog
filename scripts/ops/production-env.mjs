@@ -8,6 +8,8 @@ export function checkProductionEnv(env, build) {
     "BETTER_AUTH_SECRET",
     "GITHUB_CLIENT_ID",
     "GITHUB_CLIENT_SECRET",
+    "CONTENT_DIR",
+    "CONTENT_REFRESH_TOKEN",
   ].filter((key) => !env[key]?.trim());
   if (missing.length)
     throw new Error(`Missing production settings: ${missing.join(", ")}`);
@@ -33,4 +35,9 @@ export function checkProductionEnv(env, build) {
     throw new Error("DATABASE_URL must use PostgreSQL.");
   if (!/^https?:$/.test(new URL(env.MEILI_HOST).protocol))
     throw new Error("MEILI_HOST must use HTTP or HTTPS.");
+  // Content is mounted read-only at /content and follows the current symlink.
+  if (!/^\/content\/[a-z0-9][a-z0-9/_.-]*$/.test(env.CONTENT_DIR))
+    throw new Error("CONTENT_DIR must point inside the /content mount.");
+  if (env.CONTENT_REFRESH_TOKEN.length < 32)
+    throw new Error("CONTENT_REFRESH_TOKEN must contain at least 32 characters.");
 }
