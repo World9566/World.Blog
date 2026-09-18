@@ -9,15 +9,8 @@ previous=""
 export BLOG_RELEASE=$target
 dc config --quiet
 if [[ "${BLOG_SKIP_PULL:-0}" != 1 ]]; then dc pull postgres meilisearch gateway web ops; fi
-# Fail before stopping the current application if any transferred image is missing.
-images=$(dc --profile tools config --images)
-while IFS= read -r image; do
-  "${DOCKER[@]}" image inspect "$image" >/dev/null
-done <<< "$images"
-for image in "$BLOG_IMAGE:$target" "$BLOG_IMAGE:$target-ops"; do
-  image_revision=$("${DOCKER[@]}" image inspect "$image" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')
-  [[ "$image_revision" == "$target" ]] || { echo 'Image revision does not match requested release.' >&2; exit 1; }
-done
+image_revision=$("${DOCKER[@]}" image inspect "$BLOG_IMAGE:$target" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')
+[[ "$image_revision" == "$target" ]] || { echo 'Image revision does not match requested release.' >&2; exit 1; }
 dc run --rm --no-deps ops node scripts/ops/check-env.mjs
 dc up -d --wait --wait-timeout 120 postgres meilisearch
 before=$(schema_version)

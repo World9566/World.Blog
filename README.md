@@ -264,14 +264,10 @@ git push -u origin main
 2. 在服务器私有 `.env.production` 中填写生产 GitHub OAuth 凭据。生产 OAuth App 的 Homepage URL 为 `https://www.world9566.online`，回调为 `https://www.world9566.online/api/auth/callback/github`。其余密钥由初始化脚本生成，不要用开发密钥覆盖。
 3. 在 GitHub 仓库配置变量 `SITE_URL=https://www.world9566.online`。推送 `main` 后，检查通过才会构建并发布 GHCR 镜像。域名参与静态页面构建，换域名需要重建镜像。
 4. 在 GitHub 创建 `production` environment，并配置 `DEPLOY_HOST`、`DEPLOY_USER`、`DEPLOY_SSH_KEY`、`DEPLOY_KNOWN_HOSTS` 四个 Secrets。主机填写 Actions 能访问的 IPv4 或主机名，SSH 使用 22 端口；known_hosts 内容应通过可信连接核验。
-5. 服务器需要能够以部署账号运行 Docker，或已有 `sudo -n docker` 权限。自动部署由 GitHub 运行器使用带 `packages: read` 权限的 `GITHUB_TOKEN` 下载镜像，无需新增个人 PAT，也不依赖服务器的 GHCR 登录。当前发布目标为 `linux/amd64`。
-6. 准备就绪后设置仓库变量 `DEPLOY_ENABLED=true`，后续 main 提交会自动传输部署文件和镜像并发布。该变量未启用时只检查和发布镜像。
+5. 服务器需要能够以部署账号运行 Docker，或已有 `sudo -n docker` 权限。私有 GHCR 包使用仅有 `read:packages` 权限的凭据执行 `sudo docker login ghcr.io`；如果该账号直接访问 Docker，则用同一账号登录。
+6. 准备就绪后设置仓库变量 `DEPLOY_ENABLED=true`，后续 main 提交会自动传输部署文件并发布。该变量未启用时只检查和发布镜像。
 
-自动部署的数据路径为 `GHCR -> GitHub 运行器 -> SSH -> 服务器 Docker`。运行器读取服务器所需的镜像名称和已有镜像 ID，下载应用、维护及基础服务镜像；仅将服务器缺失或 ID 不同的镜像通过 gzip 压缩流传输。服务器导入后，核对全部镜像 ID，再以 `BLOG_SKIP_PULL=1` 执行发布，禁止 Compose 回退到在线拉取。下载、传输或核对失败会阻止后续停站和迁移。生产 `.env.production` 留在服务器。
-
-四个部署 Secrets 保持不变。`DEPLOY_SSH_KEY` 填完整的无口令部署私钥，流程会处理 Windows 换行并在连接前验证格式。运行器与服务器之间仍需能通过 SSH 22 端口传输数据；此流程不使用个人电脑作为中转。
-
-基础服务的固定版本也会复制到同一 GHCR 包。手动直接在服务器发布时，仍需要服务器访问 GHCR；私有包须以实际调用 Docker 的账号登录，例如 `sudo docker login ghcr.io`，使用仅有 `read:packages` 权限的凭据。手动发布和检查：
+基础服务的固定版本也会复制到同一 GHCR 包，生产服务器可以只连接 GHCR。手动发布和检查：
 
 ```bash
 bash scripts/ops/deploy.sh <完整40位提交SHA>

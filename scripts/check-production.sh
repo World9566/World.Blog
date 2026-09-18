@@ -47,17 +47,6 @@ echo 'Compose release selection survives cleared environment; failure cleanup pa
 "${DOCKER[@]}" build --target runner --build-arg SITE_URL="$SITE_URL" --build-arg REVISION="$revision" --tag "$BLOG_IMAGE:$revision" "$(host_path "$ROOT")"
 "${DOCKER[@]}" build --target ops --build-arg SITE_URL="$SITE_URL" --build-arg REVISION="$revision" --tag "$BLOG_IMAGE:$revision-ops" "$(host_path "$ROOT")"
 dc pull postgres meilisearch gateway
-# The transfer inventory must select the incoming revision, even when a previous
-# successful release is recorded, and expose no runtime credentials.
-printf '%s\n' 2222222222222222222222222222222222222222 > "$STATE_DIR/current-release"
-inventory=$(bash scripts/ops/runner-images.sh list "$revision")
-printf '%s\n' "$inventory" | grep -Fq "$(printf '%s\t' "$BLOG_IMAGE:$revision-ops")"
-[[ "$inventory" != *"$POSTGRES_PASSWORD"* && "$inventory" != *"$BETTER_AUTH_SECRET"* ]]
-rm -f -- "$STATE_DIR/current-release"
-# Check the actual Docker save/gzip/load format used by the runner transport.
-"${DOCKER[@]}" image save "$BLOG_IMAGE:$revision" "$BLOG_IMAGE:$revision-ops" | gzip -1 | \
-  bash scripts/ops/runner-images.sh load "$revision"
-[[ "$(bash scripts/ops/runner-images.sh list "$revision")" == "$inventory" ]]
 BLOG_SKIP_PULL=1 bash scripts/ops/deploy.sh "$revision"
 dc run -T --rm --no-deps ops node --input-type=module < scripts/check-production.mjs
 dc run --rm --no-deps -e CHECK_BASE_URL=http://gateway:8080 ops pnpm content:check
