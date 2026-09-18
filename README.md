@@ -169,9 +169,9 @@ docker compose exec web pnpm admin:check
 
 ## 写作与搜索
 
-文章存放在独立的[内容仓库](https://github.com/World9566/world-blog-content)（本地开发时 clone 到 `content/`，该路径被忽略）：
+文章存放在独立的[内容仓库](https://github.com/World9566/blog)（本地开发时 clone 到 `content/`，该路径被忽略）：
 ```powershell
-git clone https://github.com/World9566/world-blog-content content
+git clone https://github.com/World9566/blog content
 ```
 
 在其 `posts/` 下新建使用小写字母、数字和 ASCII hyphen 命名的 `.mdx` 文件：
@@ -282,7 +282,7 @@ curl --fail http://127.0.0.1:8080/api/health
 
 ### 发布文章
 
-文章在[独立内容仓库](https://github.com/World9566/world-blog-content)中编写，push 到其 `main` 即发布：内容仓库自己的 Actions 检出本仓库的校验管线做元数据校验和全量 MDX 编译（PR 上即可快速失败），然后打一个 `git bundle` 通过 SSH 送进服务器执行 `bash ~/apps/world-blog/scripts/ops/content-deploy.sh <完整40位提交SHA>`。整个过程不停站、不迁移数据库、不重建镜像，通常在一分钟内完成。
+文章在[独立内容仓库](https://github.com/World9566/blog)中编写，push 到其 `main` 即发布：内容仓库自己的 Actions 检出本仓库的校验管线做元数据校验和全量 MDX 编译（PR 上即可快速失败），然后打一个 `git bundle` 通过 SSH 送进服务器执行 `bash ~/apps/world-blog/scripts/ops/content-deploy.sh <完整40位提交SHA>`。整个过程不停站、不迁移数据库、不重建镜像，通常在一分钟内完成。
 
 内容发布的过程：服务器从 bundle 初始化或更新对象库 `~/apps/world-blog-content/repo`（服务器不访问 GitHub，内容仓库可以是私有仓库），用 `git worktree` 把该提交检出为 `releases/<SHA>`，用当前应用镜像做完整编译校验，构建搜索临时索引，全部通过后原子切换 `current` 符号链接并通知应用热刷新，再交换搜索索引、对真实站点做冒烟检查。校验或索引失败时站点保持原状；切换后的失败会连同搜索索引一起回滚。历史内容版本保留在 `releases/` 中（当前、上一版本与最近 3 个），回滚内容即用旧 SHA 重新发布。中断的发布会留下 journal，下次执行时自动恢复或清理。首次完整部署前服务器没有内容发布，`deploy.sh` 会先发布一个空内容版本，站点随后由内容仓库的首次发布填充。
 
