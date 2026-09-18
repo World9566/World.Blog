@@ -4,9 +4,13 @@ services:
   web:
     build:
       target: ci
-    # Use the image's source and dependencies instead of the host checkout;
-    # fixture articles stand in for the content repository during checks.
-    volumes:
+    # Use the image's source and dependencies instead of the host checkout
+    # (the runner checkout may have a different Linux UID than the container
+    # user, and dev.sh writes generated files at boot); fixture articles
+    # stand in for the content repository during checks. !override replaces
+    # the development mounts entirely - merging them back would bind-mount
+    # the host tree into a container that must not write to it.
+    volumes: !override
       - ./tests/fixtures/posts:/app/content/posts:ro
     ports: !reset []
   postgres:
