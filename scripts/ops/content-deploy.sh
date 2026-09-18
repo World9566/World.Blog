@@ -31,6 +31,34 @@ REPO="$CONTENT_ROOT/repo"
 JOURNAL="$STATE/in-progress"
 rm -f -- "$STATE"/bundle.* 2>/dev/null || true
 index_name=''
+bundle_file="$STATE/bundle.$$"
+if [[ "$ensure_mode" == 0 ]]; then
+  # Consume the transferred bundle before anything else: container commands
+  # in this script share the stdin descriptor, and the first docker compose
+  # run would otherwise advance it and starve the import below.
+  cat > "$bundle_file"
+fi
+
+# The revision directory is created through the maintenance container so it
+# is owned by the container user (uid 1000): web and ops share that uid and
+# can write entries, while no other account - including the deployment user -
+# can create or replace anything inside. A planted directory that is not
+# owned by that uid would make the application read attacker-controlled code,
+# so the deploy aborts loudly instead.
+ensure_cache_revision() {
+  [[ -n "$CONTENT_CACHE_DIR" ]] || return 0
+  # Create and verify inside the container: bind-mount translation layers
+  # (WSL/drvfs) can distort host-side ownership views, while the in-container
+  # view is the one the application actually reads with.
+  dc run --rm --no-deps ops sh -c '
+    mkdir -p -- "/app/.content-cache/$APP_REVISION" || exit 1
+    owner=$(stat -c %u -- "/app/.content-cache/$APP_REVISION")
+    if [ "$owner" != "1000" ]; then
+      echo "Cache revision directory is owned by uid $owner instead of the container user; refusing to publish." >&2
+      exit 1
+    fi
+  '
+}
 
 release_ready() {
   local release=$1 marker
@@ -81,21 +109,19 @@ recover_interrupted() {
   fi
 }
 
-# Fetch the bundle piped to stdin into the object database. The first run
+# Import the saved bundle into the object database. The first run
 # initializes the repository from the bundle itself.
 import_bundle() {
-  local sha=$1 bundle
-  bundle="$STATE/bundle.$$"
-  cat > "$bundle"
+  local sha=$1
   if [[ ! -d "$REPO" ]]; then
     git init --quiet "$REPO"
   fi
-  if ! git -C "$REPO" fetch --quiet "$bundle" "$sha"; then
-    rm -f -- "$bundle"
+  if ! git -C "$REPO" fetch --quiet "$bundle_file" "$sha"; then
+    rm -f -- "$bundle_file"
     echo "The transferred bundle does not contain $sha." >&2
     exit 1
   fi
-  rm -f -- "$bundle"
+  rm -f -- "$bundle_file"
 }
 
 # Releases are worktrees of the object database, so materialization is a
@@ -105,7 +131,7 @@ materialize() {
   local sha=$1 release
   release="$RELEASES/$sha"
   if release_ready "$release"; then
-    cat > /dev/null
+    rm -f -- "$bundle_file"
     echo "Reusing validated release $sha (app $BLOG_RELEASE)."
     return 0
   fi
@@ -241,17 +267,25 @@ prune_releases() {
 # Cache entries are keyed by application revision; superseded revisions can
 # never be read again and are dropped. The cost of pruning too eagerly is a
 # bounded recompile, so this runs on every content and application deploy.
+# Entries and revision directories belong to the container user (uid 1000),
+# so pruning runs through the maintenance container with that ownership; the
+# deployment user cannot remove them and must never need to.
 prune_cache() {
-  local dir name
-  [[ -n "${CONTENT_CACHE_DIR:-}" && -d "$CONTENT_CACHE_DIR" ]] || return 0
-  for dir in "$CONTENT_CACHE_DIR"/*/; do
-    [[ -d "$dir" ]] || continue
-    name=$(basename -- "$dir")
-    [[ "$name" == "$BLOG_RELEASE" ]] || rm -rf -- "$dir"
-  done
+  [[ -n "${CONTENT_CACHE_DIR:-}" ]] || return 0
+  dc run --rm --no-deps ops sh -c '
+    cd /app/.content-cache 2>/dev/null || exit 0
+    for revision in */; do
+      # A revision directory planted by another uid cannot be emptied by the
+      # container user; it is inert (the ownership guard rejects the current
+      # revision) and root has to remove the debris.
+      [ "$revision" = "$APP_REVISION/" ] || rm -rf -- "$revision" 2>/dev/null || true
+    done
+    exit 0
+  '
 }
 
 recover_interrupted
+ensure_cache_revision
 
 if [[ "$ensure_mode" == 1 ]]; then
   target=$(current_release)

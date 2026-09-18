@@ -25,8 +25,12 @@ cleanup() {
   trap - EXIT
   # Only the unique project created by this run may have its volumes removed.
   if [[ "$COMPOSE_PROJECT_NAME" == "$project" && "$project" == world-blog-ci-* ]]; then
+    # Cache entries belong to the container user; clear them through the
+    # maintenance container while it can still start, then tear the project
+    # down. Cleanup must never mask the real outcome, so all of it stays
+    # best effort.
+    dc run --rm --no-deps ops sh -c 'cd /app/.content-cache 2>/dev/null && rm -rf -- ./*' || true
     dc down --volumes --remove-orphans || true
-    # Cleanup must never mask the real outcome, so removals stay best effort.
     rm -f -- "$BLOG_ENV_FILE" || true
     rm -rf -- "$ROOT/tmp/content-$project" "$content_repo" || true
   fi
