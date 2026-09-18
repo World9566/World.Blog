@@ -29,6 +29,7 @@ CONTENT_REFRESH_TOKEN=${CONTENT_REFRESH_TOKEN:-}
 [[ -z "$CONTENT_REFRESH_TOKEN" || "$CONTENT_REFRESH_TOKEN" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "CONTENT_REFRESH_TOKEN has an invalid format." >&2; exit 1; }
 CONTENT_RELEASES_DIR=""
 CONTENT_STATE_DIR=""
+CONTENT_CACHE_DIR=""
 [[ -z "$CONTENT_ROOT" ]] || {
   CONTENT_RELEASES_DIR="$CONTENT_ROOT/releases"
   CONTENT_STATE_DIR="$CONTENT_ROOT/state"
@@ -37,9 +38,6 @@ CONTENT_STATE_DIR=""
   # The web and ops containers traverse this mount as uid 1000 (node), which
   # need not match the deployment user; umask 077 would lock them out.
   chmod 755 "$CONTENT_RELEASES_DIR"
-  # Compiled-article cache entries are written by that same uid from inside
-  # the containers, so the directory itself must be world-writable.
-  chmod 1777 "$CONTENT_CACHE_DIR"
 }
 [[ "${POSTGRES_PASSWORD:-}" =~ ^[a-fA-F0-9]{64}$ ]] || { echo "POSTGRES_PASSWORD must contain 64 hexadecimal characters." >&2; exit 1; }
 [[ "${POSTGRES_USER:-blog}" =~ ^[a-z][a-z0-9_]*$ && "${POSTGRES_DB:-blog}" =~ ^[a-z][a-z0-9_]*$ ]] || { echo "Invalid database name or user." >&2; exit 1; }
@@ -54,6 +52,16 @@ elif [[ -f "$STATE_DIR/current-release" ]]; then
   BLOG_RELEASE=$(cat "$STATE_DIR/current-release")
   [[ "$BLOG_RELEASE" =~ ^[a-f0-9]{40}$ ]] || { echo "Invalid release state." >&2; exit 1; }
   export BLOG_RELEASE
+fi
+# Compiled-article cache entries are written by the container user (uid 1000)
+# while pruning runs as the deployment user, which may be any uid. The
+# revision directory is therefore pre-created by the deployment user and left
+# world-writable without the sticky bit: containers can create entries and
+# the deployment user can remove them. Entries only hold derived public
+# content and corrupt entries self-heal, so this is not a sensitive surface.
+if [[ -n "$CONTENT_CACHE_DIR" ]]; then
+  mkdir -p "$CONTENT_CACHE_DIR/$BLOG_RELEASE"
+  chmod 0777 "$CONTENT_CACHE_DIR" "$CONTENT_CACHE_DIR/$BLOG_RELEASE"
 fi
 DOCKER=(docker)
 if ! docker info >/dev/null 2>&1; then

@@ -26,8 +26,9 @@ cleanup() {
   # Only the unique project created by this run may have its volumes removed.
   if [[ "$COMPOSE_PROJECT_NAME" == "$project" && "$project" == world-blog-ci-* ]]; then
     dc down --volumes --remove-orphans || true
-    rm -f -- "$BLOG_ENV_FILE"
-    rm -rf -- "$ROOT/tmp/content-$project" "$content_repo"
+    # Cleanup must never mask the real outcome, so removals stay best effort.
+    rm -f -- "$BLOG_ENV_FILE" || true
+    rm -rf -- "$ROOT/tmp/content-$project" "$content_repo" || true
   fi
   exit "$result"
 }
