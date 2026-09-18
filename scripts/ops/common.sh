@@ -29,7 +29,14 @@ CONTENT_REFRESH_TOKEN=${CONTENT_REFRESH_TOKEN:-}
 [[ -z "$CONTENT_REFRESH_TOKEN" || "$CONTENT_REFRESH_TOKEN" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "CONTENT_REFRESH_TOKEN has an invalid format." >&2; exit 1; }
 CONTENT_RELEASES_DIR=""
 CONTENT_STATE_DIR=""
-[[ -z "$CONTENT_ROOT" ]] || { CONTENT_RELEASES_DIR="$CONTENT_ROOT/releases"; CONTENT_STATE_DIR="$CONTENT_ROOT/state"; mkdir -p "$CONTENT_RELEASES_DIR" "$CONTENT_STATE_DIR"; }
+[[ -z "$CONTENT_ROOT" ]] || {
+  CONTENT_RELEASES_DIR="$CONTENT_ROOT/releases"
+  CONTENT_STATE_DIR="$CONTENT_ROOT/state"
+  mkdir -p "$CONTENT_RELEASES_DIR" "$CONTENT_STATE_DIR"
+  # The web and ops containers traverse this mount as uid 1000 (node), which
+  # need not match the deployment user; umask 077 would lock them out.
+  chmod 755 "$CONTENT_RELEASES_DIR"
+}
 [[ "${POSTGRES_PASSWORD:-}" =~ ^[a-fA-F0-9]{64}$ ]] || { echo "POSTGRES_PASSWORD must contain 64 hexadecimal characters." >&2; exit 1; }
 [[ "${POSTGRES_USER:-blog}" =~ ^[a-z][a-z0-9_]*$ && "${POSTGRES_DB:-blog}" =~ ^[a-z][a-z0-9_]*$ ]] || { echo "Invalid database name or user." >&2; exit 1; }
 STATE_DIR="$ROOT/.deploy/$COMPOSE_PROJECT_NAME"

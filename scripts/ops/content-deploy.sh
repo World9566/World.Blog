@@ -88,6 +88,9 @@ materialize() {
   rm -rf -- "$release" "$keep"
   mkdir -p -- "$keep"
   cp -a -- "$ROOT/content/posts" "$keep/posts"
+  # Copies keep the extraction's restrictive modes and owner; the containers
+  # read releases as uid 1000 (node), so publish explicit read access.
+  chmod -R a+rX -- "$keep"
   mv -Tf -- "$keep" "$release"
 }
 
