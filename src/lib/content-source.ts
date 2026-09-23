@@ -10,6 +10,7 @@ import { toString } from "mdast-util-to-string";
 import type { Root, RootContent } from "mdast";
 import type { Article, ArticleCover, Heading } from "./article-types";
 import { getTopic, type TopicSlug } from "./site";
+import { publicationDate } from "./publication-date";
 
 const parser = unified().use(remarkParse).use(remarkMdx).use(remarkGfm);
 const covers: ArticleCover[] = ["layers", "branches", "brackets", "search"];
@@ -133,6 +134,7 @@ export function parseArticle(source: string, filename: string): SourceArticle {
 export async function collectArticles(
   directory: string,
   now = new Date(),
+  { includeFuture = false }: { includeFuture?: boolean } = {},
 ): Promise<SourceArticle[]> {
   const filenames = (await readdir(directory))
     .filter((name) => name.endsWith(".mdx"))
@@ -162,14 +164,12 @@ export async function collectArticles(
     slugs.add(article.slug);
     all.push(article);
   }
-  const today = new Intl.DateTimeFormat("sv-SE", {
-    timeZone: "Asia/Shanghai",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(now);
+  const today = publicationDate(now);
   return all
-    .filter((article) => !article.draft && article.publishedAt <= today)
+    .filter(
+      (article) =>
+        !article.draft && (includeFuture || article.publishedAt <= today),
+    )
     .sort(
       (a, b) =>
         b.publishedAt.localeCompare(a.publishedAt) ||

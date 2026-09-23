@@ -19,7 +19,7 @@ export async function DELETE(
 ) {
   return communityResponse(async () => {
     const { articleId, commentId } = await context.params;
-    if (!publishedArticle(articleId) || !isCommentId(commentId))
+    if (!(await publishedArticle(articleId)) || !isCommentId(commentId))
       return accountError("评论不存在。", 404);
     const authorization = await authorizeAccountRequest(request);
     if (authorization.error) return authorization.error;

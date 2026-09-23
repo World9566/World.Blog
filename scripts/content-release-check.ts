@@ -7,11 +7,11 @@ import { contentDirectory, validateContent } from "./content";
 
 // The authoritative gate before a content release goes live: metadata
 // validation plus a full MDX compile of every article, using the same compile
-// pipeline the running application renders with. A release that passes here
-// cannot fail at render time.
+// pipeline the running application renders with. Live HTTP checks also verify
+// rendering after the switch and roll back on failure.
 async function main() {
   const directory = contentDirectory();
-  const articles = await validateContent();
+  const articles = await validateContent({ includeFuture: true });
   const failures: string[] = [];
   for (const article of articles) {
     try {

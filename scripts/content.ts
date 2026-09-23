@@ -5,8 +5,7 @@ import { collectArticles, type SourceArticle } from "../src/lib/content-source";
 
 export function contentDirectory(): string {
   return (
-    process.env.CONTENT_DIR ||
-    path.join(process.cwd(), "content", "posts")
+    process.env.CONTENT_DIR || path.join(process.cwd(), "content", "posts")
   );
 }
 
@@ -15,13 +14,15 @@ export function contentDirectory(): string {
 // must always stop a release before it reaches readers. The application
 // repository no longer contains articles, so with no explicit CONTENT_DIR and
 // no local clone there is simply nothing to validate yet.
-export async function validateContent(): Promise<SourceArticle[]> {
+export async function validateContent(
+  options: { includeFuture?: boolean } = {},
+): Promise<SourceArticle[]> {
   const directory = contentDirectory();
   if (!process.env.CONTENT_DIR && !existsSync(directory)) {
-    console.log("No content directory found; nothing to validate.");
+    console.error("No content directory found; nothing to validate.");
     return [];
   }
-  return collectArticles(directory);
+  return collectArticles(directory, new Date(), options);
 }
 
 if (

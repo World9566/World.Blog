@@ -61,6 +61,7 @@ dc pull postgres meilisearch gateway
 BLOG_SKIP_PULL=1 bash scripts/ops/deploy.sh "$revision"
 dc run -T --rm --no-deps ops node --input-type=module < scripts/check-production.mjs
 dc run --rm --no-deps -e CHECK_BASE_URL=http://gateway:8080 ops pnpm content:check
+dc run --rm --no-deps ops node --conditions=react-server --import tsx scripts/check-search-publication.ts
 
 # Publish one article through the bundle pipeline: a throwaway repository
 # stands in for the content repository, its object database travels as a git
@@ -81,6 +82,36 @@ rm -f -- "$ROOT/tmp/content.bundle"
 [[ -f "$CONTENT_RELEASES_DIR/$content_sha/posts/bundle-check.mdx" ]]
 dc run --rm --no-deps -e CHECK_BASE_URL=http://gateway:8080 -e "CONTENT_DIR=/content/$content_sha/posts" ops pnpm content:check
 echo 'Content bundle delivery and worktree release checks passed.'
+# Exercise the real rollback path after both the symlink and search index
+# have switched. Only the HTTP verification command is failed; all recovery
+# calls use the real maintenance image, web service and search engine.
+sed 's/post_bundle_check/post_rollback_candidate/; s/slug: "bundle-check"/slug: "rollback-candidate"/' \
+  "$content_repo/posts/bundle-check.mdx" > "$content_repo/posts/rollback-candidate.mdx"
+git -C "$content_repo" add posts
+git -C "$content_repo" -c user.name=ci -c user.email=ci@example.invalid commit --quiet -m "content: rollback check"
+failed_sha=$(git -C "$content_repo" rev-parse HEAD)
+git -C "$content_repo" bundle create "$ROOT/tmp/content.bundle" HEAD >/dev/null
+export BLOG_REHEARSAL_PROJECT="$project"
+if (
+  docker() {
+    if [[ "$BLOG_REHEARSAL_PROJECT" == world-blog-ci-* && " $* " == *" --project-name $BLOG_REHEARSAL_PROJECT "* && " $* " == *" pnpm content:check "* ]]; then
+      echo 'Intentional rehearsal verification failure.' >&2
+      return 1
+    fi
+    command docker "$@"
+  }
+  export -f docker
+  bash scripts/ops/content-deploy.sh "$failed_sha" < "$ROOT/tmp/content.bundle"
+); then
+  echo 'The failed content release unexpectedly succeeded.' >&2
+  exit 1
+fi
+rm -f -- "$ROOT/tmp/content.bundle"
+[[ "$(readlink "$CONTENT_RELEASES_DIR/current")" == "$content_sha" ]]
+[[ -f "$CONTENT_RELEASES_DIR/$content_sha/posts/bundle-check.mdx" ]]
+[[ ! -f "$CONTENT_STATE_DIR/in-progress" ]]
+dc run --rm --no-deps -e CHECK_BASE_URL=http://gateway:8080 -e "CONTENT_DIR=/content/$content_sha/posts" ops pnpm content:check
+echo 'Content and search rollback checks passed.'
 sql "CREATE TABLE recovery_probe (id integer PRIMARY KEY, value text NOT NULL); INSERT INTO recovery_probe VALUES (1, 'backup-roundtrip');"
 backup=$(bash scripts/ops/backup.sh)
 cmp -s "$ENV_FILE" "$backup.env"

@@ -78,35 +78,30 @@ previous_release() { readlink "$RELEASES/previous" 2>/dev/null || true; }
 
 journal_read() { sed -n "s/^$1=//p" "$JOURNAL" 2>/dev/null | tail -n1; }
 journal_write() {
-  printf 'old=%s\nnew=%s\ntemp=%s\nswapped=%s\n' \
-    "$(current_release)" "$1" "${2:-}" 0 > "$JOURNAL.new"
-  mv -Tf -- "$JOURNAL.new" "$JOURNAL"
-}
-journal_update_swapped() {
-  printf 'old=%s\nnew=%s\ntemp=%s\nswapped=1\n' \
-    "$(journal_read old)" "$(journal_read new)" "${1:-}" > "$JOURNAL.new"
+  printf 'old=%s\nnew=%s\ntemp=%s\n' \
+    "$(current_release)" "$1" "${2:-}" > "$JOURNAL.new"
   mv -Tf -- "$JOURNAL.new" "$JOURNAL"
 }
 
-# A crash can leave a half-finished deploy. The current symlink tells us how
-# far it got; recovery finishes or discards the interrupted transition before
-# anything else touches the releases.
+# A swap may complete just before the process dies. Repeating that swap would
+# reverse it, so recover by rebuilding the known previous release instead.
 recover_interrupted() {
   [[ -f "$JOURNAL" ]] || return 0
-  local old new temp swapped cur
-  old=$(journal_read old)
-  new=$(journal_read new)
-  temp=$(journal_read temp)
-  swapped=$(journal_read swapped)
-  cur=$(current_release)
-  echo "Recovering an interrupted content deploy (new=$new)." >&2
-  if [[ "$cur" == "$new" && -n "$new" && "$swapped" == 0 && -n "$temp" ]]; then
-    # The switch happened but the search swap did not; finish it.
-    dc run --rm --no-deps ops pnpm search:swap "$temp"
-    rm -f -- "$JOURNAL"
-  else
-    rm -f -- "$JOURNAL"
-  fi
+  echo 'Recovering an interrupted content deploy.' >&2
+  rollback_release
+}
+
+# All destructive release operations go through this guard. Never follow a
+# release alias or remove a directory still referenced by current/previous.
+remove_release() {
+  local sha=$1 release
+  [[ "$sha" =~ ^[a-f0-9]{40}$ ]] || return 1
+  release="$RELEASES/$sha"
+  [[ ! -L "$release" && "$sha" != "$(current_release)" && "$sha" != "$(previous_release)" ]] || {
+    echo "Refusing to remove a protected content release: $sha" >&2
+    return 1
+  }
+  git -C "$REPO" worktree remove --force "$release" 2>/dev/null || rm -rf -- "$release"
 }
 
 # Import the saved bundle into the object database. The first run
@@ -125,8 +120,8 @@ import_bundle() {
 }
 
 # Releases are worktrees of the object database, so materialization is a
-# checkout, not a copy. A directory without a valid marker is debris from an
-# interrupted run and is removed before re-adding.
+# checkout, not a copy. Existing worktrees are revalidated in place; only
+# unprotected debris is removed before re-adding.
 materialize() {
   local sha=$1 release
   release="$RELEASES/$sha"
@@ -136,10 +131,15 @@ materialize() {
     return 0
   fi
   import_bundle "$sha"
-  git -C "$REPO" worktree remove --force "$release" 2>/dev/null || rm -rf -- "$release"
+  # An application revision invalidates the validation marker, not the
+  # immutable worktree. Revalidate it in place, including when it is live.
+  if [[ -d "$release" && ! -L "$release" && "$(git -C "$release" rev-parse HEAD 2>/dev/null)" == "$sha" ]]; then
+    return 0
+  fi
+  remove_release "$sha"
   git -C "$REPO" worktree prune
   if ! git -C "$REPO" worktree add --quiet --detach "$release" "$sha"; then
-    rm -rf -- "$release"
+    remove_release "$sha"
     echo "Worktree checkout failed for $sha." >&2
     exit 1
   fi
@@ -154,9 +154,8 @@ release_check() {
   if release_ready "$release"; then return 0; fi
   echo "Validating release $sha with the running application image..." >&2
   if ! dc run --rm --no-deps -e "CONTENT_DIR=/content/$sha/posts" ops pnpm content:release-check; then
-    git -C "$REPO" worktree remove --force "$release" 2>/dev/null || rm -rf -- "$release"
-    echo 'Content release check failed. The live site was not touched.' >&2
-    exit 1
+    echo 'Content release check failed. Existing release directories were preserved.' >&2
+    return 1
   fi
   write_ready "$release"
 }
@@ -167,8 +166,7 @@ prepare_search() {
   temp=$(printf '%s\n' "$output" | sed -n 's/^PREPARED //p' | tail -n1)
   if [[ ! "$temp" =~ ^blog_articles_build_[a-f0-9]{16}$ ]]; then
     echo "Search preparation did not report an index. Output: $output" >&2
-    rm -rf -- "$RELEASES/$sha"
-    exit 1
+    return 1
   fi
   index_name=$temp
 }
@@ -178,11 +176,11 @@ switch_release() {
   old=$(current_release)
   if [[ "$old" == "$sha" ]]; then return 0; fi
   if [[ -n "$old" ]]; then
-    ln -sfn -- "$old" "$RELEASES/previous.tmp.$$"
-    mv -Tf -- "$RELEASES/previous.tmp.$$" "$RELEASES/previous"
+    ln -sfn -- "$old" "$RELEASES/previous.tmp.$$" || return 1
+    mv -Tf -- "$RELEASES/previous.tmp.$$" "$RELEASES/previous" || return 1
   fi
-  ln -sfn -- "$sha" "$RELEASES/current.tmp.$$"
-  mv -Tf -- "$RELEASES/current.tmp.$$" "$RELEASES/current"
+  ln -sfn -- "$sha" "$RELEASES/current.tmp.$$" || return 1
+  mv -Tf -- "$RELEASES/current.tmp.$$" "$RELEASES/current" || return 1
 }
 
 refresh_web() {
@@ -214,28 +212,49 @@ live_check() {
     ops pnpm content:check
 }
 
-# Content and search move as one release. Swapping back the index restores the
-# previous documents because they sit in the temporary index after the swap.
+# Rebuilding from the previous worktree is idempotent even if the search swap
+# completed before a connection failure. Keep the journal until both the site
+# and index are restored; an interrupted recovery can safely run again.
 rollback_release() {
-  local old new temp swapped
+  local old temp
   old=$(journal_read old)
-  new=$(journal_read new)
   temp=$(journal_read temp)
-  swapped=$(journal_read swapped)
-  rm -f -- "$JOURNAL"
-  if [[ -n "$old" && -n "$new" && "$old" != "$new" ]]; then
-    if [[ -n "$temp" && "$swapped" == 1 ]]; then
-      dc run --rm --no-deps ops pnpm search:swap "$temp" || true
-    fi
-    switch_release "$old"
-    refresh_web || true
-    echo "Content rolled back to $old." >&2
+  [[ "$old" == empty || "$old" =~ ^[a-f0-9]{40}$ ]] || {
+    echo 'Recovery requires a valid previous content release; journal retained.' >&2
+    return 1
+  }
+  [[ -d "$RELEASES/$old/posts" ]] || return 1
+  switch_release "$old" || return 1
+  # During an application deploy the web container is deliberately stopped.
+  if [[ "$ensure_mode" == 0 ]]; then refresh_web || return 1; fi
+  dc run --rm --no-deps -e "CONTENT_DIR=/content/$old/posts" ops pnpm search:sync || return 1
+  record_state || return 1
+  discard_search "$temp"
+  echo "Content and search restored to $old." >&2
+}
+
+discard_search() {
+  local temp=$1
+  [[ -n "$temp" ]] || return 0
+  # Cleanup cannot invalidate a completed publish or recovery. Old build
+  # indexes are also collected by search:prepare on later runs.
+  dc run --rm --no-deps ops pnpm search:discard "$temp" ||
+    echo "Search cleanup deferred for $temp." >&2
+}
+
+publication_failed() {
+  local result=$?
+  trap - ERR
+  echo 'Content publication failed; restoring the previous release.' >&2
+  if ! rollback_release; then
+    echo 'Recovery is incomplete. The journal is retained for the next operation.' >&2
   fi
+  exit "$result"
 }
 
 record_state() {
-  printf '%s\n' "$(current_release)" > "$STATE/current-content"
-  printf '%s\n' "$(previous_release)" > "$STATE/previous-content"
+  printf '%s\n' "$(current_release)" > "$STATE/current-content" || return 1
+  printf '%s\n' "$(previous_release)" > "$STATE/previous-content" || return 1
   if [[ -f "$JOURNAL" ]]; then rm -f -- "$JOURNAL"; fi
 }
 
@@ -244,9 +263,10 @@ prune_releases() {
   keep_current=$(current_release)
   keep_previous=$(previous_release)
   local -a others=()
-  for dir in "$RELEASES"/*/; do
-    [[ -d "$dir" ]] || continue
+  for dir in "$RELEASES"/*; do
+    [[ -d "$dir" && ! -L "$dir" ]] || continue
     name=$(basename -- "$dir")
+    [[ "$name" =~ ^[a-f0-9]{40}$ ]] || continue
     if [[ "$name" != "$keep_current" && "$name" != "$keep_previous" ]]; then
       others+=("$dir")
     fi
@@ -259,7 +279,7 @@ prune_releases() {
     done | sort -rn | cut -d' ' -f2-
   )
   for d in "${sorted[@]:3}"; do
-    git -C "$REPO" worktree remove --force "$d" 2>/dev/null || rm -rf -- "$d"
+    remove_release "$(basename -- "$d")"
   done
   [[ -d "$REPO" ]] && git -C "$REPO" worktree prune
 }
@@ -306,6 +326,8 @@ if [[ "$ensure_mode" == 1 ]]; then
     exit 0
   fi
   release_check "$target"
+  # Rebuild with this image's search schema, including scheduled articles.
+  dc run --rm --no-deps ops pnpm search:sync
   prune_cache
   echo "Content release $target is valid under app $BLOG_RELEASE."
   exit 0
@@ -317,20 +339,14 @@ release_check "$sha"
 prepare_search "$sha"
 
 journal_write "$sha" "$index_name"
+trap publication_failed ERR
 switch_release "$sha"
-if ! refresh_web; then
-  echo 'Web refresh failed. Rolling back the content switch.' >&2
-  rollback_release
-  exit 1
-fi
+refresh_web
 swap_search
-journal_update_swapped "$index_name"
-if ! live_check "$sha"; then
-  echo 'Live check failed. Rolling back content and search together.' >&2
-  rollback_release
-  exit 1
-fi
+live_check "$sha"
 record_state
+trap - ERR
+discard_search "$index_name"
 prune_releases
 prune_cache
 echo "Content deployed: $sha (app $BLOG_RELEASE, index $index_name)."

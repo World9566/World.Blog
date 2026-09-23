@@ -122,6 +122,33 @@ async function main() {
       ).status,
       404,
     );
+    const withdrawnComment = await prisma.comment.create({
+      data: {
+        id: randomUUID(),
+        articleId: "qa-unpublished",
+        userId: ids[0],
+        body: "Keep this comment while its article is unpublished.",
+      },
+    });
+    assert.equal(
+      (
+        await request(
+          `/api/articles/qa-unpublished/comments/${withdrawnComment.id}`,
+          0,
+          "DELETE",
+          {},
+        )
+      ).status,
+      404,
+    );
+    assert.equal(
+      (
+        await prisma.comment.findUniqueOrThrow({
+          where: { id: withdrawnComment.id },
+        })
+      ).body,
+      withdrawnComment.body,
+    );
     passed(
       "public reads work; mutations, private activity, and unpublished articles are guarded",
     );

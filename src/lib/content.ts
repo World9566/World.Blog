@@ -4,6 +4,7 @@ import path from "node:path";
 import type { Article } from "./article-types";
 import { collectArticles, type SourceArticle } from "./content-source";
 import { compileArticleSource, type ArticleComponent } from "./mdx-compile";
+import { publicationDate } from "./publication-date";
 
 // Content is read at request time from a directory that deploys can switch
 // atomically (a symlink swap). Each snapshot pins one resolved release
@@ -40,13 +41,8 @@ const state: ContentState = (globalStore.__blogContent ??= {
 
 function contentDirectory(): string {
   return (
-    process.env.CONTENT_DIR ||
-    path.join(process.cwd(), "content", "posts")
+    process.env.CONTENT_DIR || path.join(process.cwd(), "content", "posts")
   );
-}
-
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
 }
 
 async function fingerprint(directory: string): Promise<string> {
@@ -90,9 +86,12 @@ async function load(): Promise<void> {
     }
     const directory = await realpath(configured).catch(() => {
       // The most likely cause deserves an actionable hint.
-      throw Object.assign(new Error(`Content directory is missing: ${configured}`), {
-        hint: "Content is a separate repository; clone it (e.g. into content/) or fix the CONTENT_DIR mount.",
-      });
+      throw Object.assign(
+        new Error(`Content directory is missing: ${configured}`),
+        {
+          hint: "Content is a separate repository; clone it (e.g. into content/) or fix the CONTENT_DIR mount.",
+        },
+      );
     });
     const published = await collectArticles(directory);
     const sources = new Map<string, string>();
@@ -121,7 +120,7 @@ async function load(): Promise<void> {
     state.loadError =
       error instanceof Error ? error.message : "Content failed to load";
   } finally {
-    state.lastDay = today();
+    state.lastDay = publicationDate();
   }
 }
 
@@ -140,7 +139,7 @@ async function ensureFresh(force = false): Promise<void> {
   state.lastCheck = now;
   // The publication day is part of the published filter, so crossing a day
   // boundary must re-evaluate future-dated articles without any trigger.
-  const day = today();
+  const day = publicationDate();
   if (!force && state.snapshot && state.lastDay === day) {
     if (!(await needsReload())) return;
   }
@@ -159,9 +158,7 @@ export async function findArticle(slug: string): Promise<Article | undefined> {
   return (await getArticles()).find((article) => article.slug === slug);
 }
 
-export async function articlesInTopic(
-  topic: string,
-): Promise<Article[]> {
+export async function articlesInTopic(topic: string): Promise<Article[]> {
   return (await getArticles()).filter((article) => article.topic === topic);
 }
 

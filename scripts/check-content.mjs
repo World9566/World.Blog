@@ -94,7 +94,18 @@ if (!process.env.SKIP_SEARCH_INDEX_CHECK) {
     {
       method: "POST",
       headers,
-      body: JSON.stringify({ q: "", limit: Math.max(20, articles.length) }),
+      body: JSON.stringify({
+        q: "",
+        limit: Math.max(20, articles.length),
+        filter: `publishedDay <= ${new Intl.DateTimeFormat("sv-SE", {
+          timeZone: "Asia/Shanghai",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+        })
+          .format(new Date())
+          .replaceAll("-", "")}`,
+      }),
       signal: AbortSignal.timeout(10000),
     },
   );

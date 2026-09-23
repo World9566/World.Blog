@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import type { Article } from "../src/lib/article-types";
 import { validateContent } from "./content";
+import { publicationDay } from "../src/lib/publication-date";
 
 const base = "blog_articles";
 
@@ -43,8 +44,11 @@ async function wait(task: { taskUid: number }) {
     const result = await request(`/tasks/${task.taskUid}`);
     if (result.status === "succeeded") return;
     if (result.status === "failed" || result.status === "canceled")
-      throw new Error(
-        `Search task ${result.status}: ${result.error?.code ?? "unknown"}`,
+      throw Object.assign(
+        new Error(
+          `Search task ${result.status}: ${result.error?.code ?? "unknown"}`,
+        ),
+        { code: result.error?.code },
       );
     await new Promise((resolve) => setTimeout(resolve, 200));
   }
@@ -67,13 +71,20 @@ export async function prepareSearch(
       await request(`/indexes/${temporary}/settings`, "PATCH", {
         searchableAttributes: ["title", "description", "tags", "text"],
         displayedAttributes: ["id"],
-        filterableAttributes: ["topic"],
+        filterableAttributes: ["topic", "publishedDay"],
         pagination: { maxTotalHits: Math.max(1000, articles.length) },
       }),
     );
     if (articles.length)
       await wait(
-        await request(`/indexes/${temporary}/documents`, "POST", articles),
+        await request(
+          `/indexes/${temporary}/documents`,
+          "POST",
+          articles.map((article) => ({
+            ...article,
+            publishedDay: publicationDay(article.publishedAt),
+          })),
+        ),
       );
     // Crashes between prepare and swap can orphan build indexes.
     await cleanupOrphans(temporary);
@@ -111,8 +122,11 @@ async function cleanupOrphans(keep: string) {
 
 // The swap itself is a single atomic task, so the visible index always points
 // at exactly one release of the content. On failure the temporary index is
-// kept so a retry can swap it after fixing the cause.
-export async function swapSearch(preparation: SearchPreparation): Promise<void> {
+// retained until verification. After an ambiguous failure, recovery rebuilds
+// from a known release rather than repeating a potentially completed swap.
+export async function swapSearch(
+  preparation: SearchPreparation,
+): Promise<void> {
   const { host, key } = configuration();
   const existing = await fetch(new URL(`/indexes/${base}`, host), {
     headers: { Authorization: `Bearer ${key}` },
@@ -135,7 +149,33 @@ export async function swapSearch(preparation: SearchPreparation): Promise<void> 
 export async function syncSearch(articles: Article[]): Promise<void> {
   const preparation = await prepareSearch(articles);
   await swapSearch(preparation);
-  await wait(await request(`/indexes/${preparation.temporary}`, "DELETE"));
+  await discardSearch(preparation);
+}
+
+export async function discardSearch({
+  temporary,
+}: SearchPreparation): Promise<void> {
+  if (!/^blog_articles_build_[a-f0-9]{16}$/.test(temporary))
+    throw new Error("Invalid temporary search index");
+  const { host, key } = configuration();
+  const response = await fetch(new URL(`/indexes/${temporary}`, host), {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${key}` },
+    signal: AbortSignal.timeout(10000),
+  });
+  // Recovery may repeat cleanup after the index has already been removed.
+  if (response.status === 404) return;
+  if (!response.ok) throw new Error(`Search cleanup HTTP ${response.status}`);
+  await wait(await response.json()).catch((error: unknown) => {
+    // Meilisearch also reports missing indexes through an accepted async
+    // deletion task, not only through an immediate HTTP 404.
+    if (
+      !(error instanceof Error) ||
+      !("code" in error) ||
+      error.code !== "index_not_found"
+    )
+      throw error;
+  });
 }
 
 if (
@@ -144,30 +184,32 @@ if (
 ) {
   const mode = process.argv[2];
   if (mode === "prepare") {
-    validateContent()
-      .then((articles) => prepareSearch(articles.map(({ filename, draft, ...article }) => article)))
+    validateContent({ includeFuture: true })
+      .then((articles) =>
+        prepareSearch(
+          articles.map(({ filename, draft, ...article }) => article),
+        ),
+      )
       .then((preparation) => console.log(`PREPARED ${preparation.temporary}`))
       .catch((error) => {
         console.error(error.message);
         process.exitCode = 1;
       });
-  } else if (mode === "swap") {
+  } else if (mode === "swap" || mode === "discard") {
     const temporary = process.argv[3];
-    if (!temporary?.startsWith(`${base}_build_`)) {
-      console.error("Usage: search-sync.ts swap <temporary index>");
+    if (!temporary || !/^blog_articles_build_[a-f0-9]{16}$/.test(temporary)) {
+      console.error("Usage: search-sync.ts swap|discard <temporary index>");
       process.exitCode = 1;
     } else {
-      swapSearch({ temporary })
-        .then(() =>
-          request(`/indexes/${temporary}`, "DELETE").then(wait),
-        )
-        .catch((error) => {
+      (mode === "swap" ? swapSearch : discardSearch)({ temporary }).catch(
+        (error) => {
           console.error(error.message);
           process.exitCode = 1;
-        });
+        },
+      );
     }
   } else if (mode === undefined) {
-    validateContent()
+    validateContent({ includeFuture: true })
       .then((articles) =>
         syncSearch(articles.map(({ filename, draft, ...article }) => article)),
       )
@@ -176,7 +218,9 @@ if (
         process.exitCode = 1;
       });
   } else {
-    console.error("Usage: search-sync.ts [prepare|swap <index>]");
+    console.error(
+      "Usage: search-sync.ts [prepare|swap <index>|discard <index>]",
+    );
     process.exitCode = 1;
   }
 }

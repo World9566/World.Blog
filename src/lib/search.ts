@@ -1,6 +1,7 @@
 import "server-only";
 import { getArticles } from "./content";
 import type { Article } from "./article-types";
+import { publicationDay } from "./publication-date";
 
 export function excerpt(article: Article, query: string) {
   const term = query.toLocaleLowerCase().split(/\s+/).find(Boolean) || "";
@@ -60,7 +61,10 @@ export async function searchArticles(
         body: JSON.stringify({
           q: query,
           limit: Math.max(20, articles.length),
-          ...(topic ? { filter: `topic = ${JSON.stringify(topic)}` } : {}),
+          filter: [
+            `publishedDay <= ${publicationDay()}`,
+            ...(topic ? [`topic = ${JSON.stringify(topic)}`] : []),
+          ].join(" AND "),
         }),
         cache: "no-store",
         signal: AbortSignal.timeout(2500),

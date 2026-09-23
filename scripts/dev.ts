@@ -27,7 +27,7 @@ async function main() {
   let retrySearch = false;
   let busy = false;
   async function rebuild() {
-    const articles = await validateContent();
+    const articles = await validateContent({ includeFuture: true });
     try {
       await syncSearch(articles);
       retrySearch = false;
