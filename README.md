@@ -315,6 +315,10 @@ curl --fail http://127.0.0.1:8080/api/health
 
 发布会短暂停止入口和应用，先备份，再执行数据库迁移、发布文章内容并检查健康状态。相同迁移版本下可通过 `bash scripts/ops/rollback.sh` 回退上一应用；新增或失败的迁移需要人工恢复或修复，不能只回退应用镜像。
 
+停站前先逐个拉取镜像，以减少同时访问镜像源的连接数。每次拉取最多等待 180 秒，每个镜像最多尝试 3 次，全部下载共用 600 秒预算；超时会断开本次拉取并自动重试，强制结束进程最多额外等待 15 秒。下载失败不会停止现有服务或执行数据库迁移。日志会显示镜像地址、尝试次数和超时原因；应用和维护镜像都会核对提交版本。镜像源持续故障仍会使部署失败，重跑不会跳过镜像完整性检查。
+
+手动运维时可通过命令环境变量调整 `BLOG_PULL_ATTEMPT_TIMEOUT`、`BLOG_PULL_TOTAL_TIMEOUT`、`BLOG_PULL_ATTEMPTS`、`BLOG_PULL_RETRY_DELAY`（时间单位为秒），不要添加到 `.env.production`。GitHub deploy job 的 20 分钟总时限仍然生效。
+
 ### 发布文章
 
 文章在[独立内容仓库](https://github.com/World9566/blog)中编写，push 到其 `main` 即发布：内容仓库自己的 Actions 检出本仓库的校验管线做元数据校验和全量 MDX 编译（PR 上即可快速失败），然后打一个 `git bundle` 通过 SSH 送进服务器执行 `bash ~/apps/world-blog/scripts/ops/content-deploy.sh <完整40位提交SHA>`。整个过程不停站、不迁移数据库、不重建镜像，通常在一分钟内完成。
