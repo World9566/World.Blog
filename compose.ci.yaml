@@ -12,6 +12,8 @@ services:
     # the host tree into a container that must not write to it.
     volumes: !override
       - ./tests/fixtures/posts:/app/content/posts:ro
+      - ./tests/fixtures/topics.json:/app/content/topics.json:ro
+      - ./tests/fixtures/media:/app/content/media:ro
     ports: !reset []
   postgres:
     ports: !reset []

@@ -50,7 +50,34 @@ for (const article of articles) {
   assert.ok(html.includes(htmlText(article.title)), `${article.slug} title`);
   assert.ok(html.includes("world9566"), `${article.slug} author`);
   await page(`/topics/${article.topic}`);
+  assert.ok(
+    html.includes(htmlText(article.topicName)),
+    `${article.slug} topic name`,
+  );
+  // The first article in a topic must appear on its first pagination page.
+  if (
+    articles.find((item) => item.topic === article.topic)?.id === article.id
+  ) {
+    const filtered = await page(`/articles?topic=${article.topic}`);
+    assert.ok(
+      filtered.includes(htmlText(article.title)),
+      `${article.slug} topic filter`,
+    );
+  }
+  if (article.cover?.startsWith("/media/")) {
+    const image = await fetch(new URL(article.cover, base));
+    assert.equal(image.status, 200, article.cover);
+    assert.ok(image.headers.get("content-type")?.startsWith("image/"));
+    assert.equal(image.headers.get("cache-control"), "no-store");
+    assert.ok((await image.arrayBuffer()).byteLength > 0);
+    assert.ok(html.includes(article.cover), `${article.slug} cover`);
+  }
 }
+assert.ok(
+  !(await page("/topics")).includes("topic-number"),
+  "topic directory has no numbering",
+);
+await page("/media/not-published.png", 404);
 await page("/articles/no-such-article-smoke-test", 404);
 await page("/topics/no-such-topic-smoke-test", 404);
 
@@ -61,8 +88,10 @@ assert.equal(
   "RSS item count",
 );
 const sitemap = await page("/sitemap.xml");
-for (const article of articles)
+for (const article of articles) {
   assert.ok(sitemap.includes(`/articles/${article.slug}`), "sitemap article");
+  assert.ok(sitemap.includes(`/topics/${article.topic}`), "sitemap topic");
+}
 
 const query = articles[0]?.tags[0];
 if (query) {

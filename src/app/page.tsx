@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getArticles } from "@/lib/content";
-import { topics, getTopic } from "@/lib/site";
+import { topicsForArticles } from "@/lib/topics";
 import { ArticleArt } from "@/components/article-art";
 import { ArticleCard } from "@/components/article-card";
 import { Icon } from "@/components/icon";
@@ -8,6 +8,7 @@ import { Icon } from "@/components/icon";
 export const dynamic = "force-dynamic";
 export default async function Home() {
   const articles = await getArticles();
+  const topics = topicsForArticles(articles);
   const featured = articles.find((article) => article.featured) || articles[0];
   const latest = articles
     .filter((article) => article.id !== featured?.id)
@@ -37,9 +38,11 @@ export default async function Home() {
       </section>
       {featured && (
         <section className="featured-section">
-          <div className="container featured-grid">
+          <div
+            className={`container featured-grid${featured.cover ? "" : " featured-text-only"}`}
+          >
             <div className="featured-copy">
-              <p className="eyebrow">精选 · {getTopic(featured.topic)?.name}</p>
+              <p className="eyebrow">精选 · {featured.topicName}</p>
               <h2>
                 <Link href={`/articles/${featured.slug}`}>
                   {featured.title}
@@ -53,14 +56,16 @@ export default async function Home() {
                 {featured.readingMinutes} 分钟阅读
               </span>
             </div>
-            <Link
-              href={`/articles/${featured.slug}`}
-              className="featured-art-link"
-              aria-label={`阅读：${featured.title}`}
-              tabIndex={-1}
-            >
-              <ArticleArt cover={featured.cover} large />
-            </Link>
+            {featured.cover && (
+              <Link
+                href={`/articles/${featured.slug}`}
+                className="featured-art-link"
+                aria-label={`阅读：${featured.title}`}
+                tabIndex={-1}
+              >
+                <ArticleArt cover={featured.cover} large />
+              </Link>
+            )}
           </div>
         </section>
       )}
@@ -86,36 +91,33 @@ export default async function Home() {
           )}
         </div>
       </section>
-      <section className="section">
-        <div className="container">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">循着兴趣</p>
-              <h2>找到你的下一篇。</h2>
+      {topics.length > 0 && (
+        <section className="section">
+          <div className="container">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">循着兴趣</p>
+                <h2>找到你的下一篇。</h2>
+              </div>
+            </div>
+            <div className="topic-grid">
+              {topics.map((topic) => (
+                <Link
+                  href={`/topics/${topic.slug}`}
+                  key={topic.slug}
+                  className="topic-card"
+                >
+                  <h3>{topic.name}</h3>
+                  {topic.description && <p>{topic.description}</p>}
+                  <span className="topic-bottom">
+                    {topic.count} 篇文章 <Icon name="arrow" />
+                  </span>
+                </Link>
+              ))}
             </div>
           </div>
-          <div className="topic-grid">
-            {topics.map((topic) => (
-              <Link
-                href={`/topics/${topic.slug}`}
-                key={topic.slug}
-                className="topic-card"
-              >
-                <span className="topic-number">{topic.symbol}</span>
-                <h3>{topic.name}</h3>
-                <p>{topic.description}</p>
-                <span className="topic-bottom">
-                  {
-                    articles.filter((article) => article.topic === topic.slug)
-                      .length
-                  }{" "}
-                  篇文章 <Icon name="arrow" />
-                </span>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
     </main>
   );
 }

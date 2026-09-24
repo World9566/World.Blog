@@ -8,12 +8,14 @@ import remarkMdx from "remark-mdx";
 import remarkGfm from "remark-gfm";
 import { toString } from "mdast-util-to-string";
 import type { Root, RootContent } from "mdast";
-import type { Article, ArticleCover, Heading } from "./article-types";
-import { getTopic, type TopicSlug } from "./site";
+import type { Article, Heading } from "./article-types";
+import { defaultTopic } from "./topics";
+import { readTopics } from "./topic-source";
+import { parseCover, isLocalCover } from "./article-cover";
+import { inspectCoverFile } from "./content-media";
 import { publicationDate } from "./publication-date";
 
 const parser = unified().use(remarkParse).use(remarkMdx).use(remarkGfm);
-const covers: ArticleCover[] = ["layers", "branches", "brackets", "search"];
 export interface SourceArticle extends Article {
   filename: string;
   draft: boolean;
@@ -69,8 +71,9 @@ export function parseArticle(source: string, filename: string): SourceArticle {
   if (!/^[a-z0-9][a-z0-9_-]*$/.test(id)) throw new Error("Invalid article id");
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug))
     throw new Error("Invalid article slug");
-  const topic = field(data, "topic");
-  if (!getTopic(topic)) throw new Error(`Unknown topic: ${topic}`);
+  const topic = field(data, "topic", 80);
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(topic))
+    throw new Error("Invalid topic slug");
   if (typeof data.draft !== "boolean")
     throw new Error("draft must be explicitly true or false");
   if (data.featured !== undefined && typeof data.featured !== "boolean")
@@ -85,7 +88,7 @@ export function parseArticle(source: string, filename: string): SourceArticle {
   ) {
     throw new Error("tags must contain 1 to 6 non-empty strings");
   }
-  if (!covers.includes(data.cover)) throw new Error("Unknown article cover");
+  const cover = parseCover(data.cover);
   const publishedAt = dateField(data, "publishedAt");
   const updatedAt =
     data.updatedAt === undefined ? publishedAt : dateField(data, "updatedAt");
@@ -120,9 +123,11 @@ export function parseArticle(source: string, filename: string): SourceArticle {
     description: field(data, "description", 240),
     publishedAt,
     updatedAt,
-    topic: topic as TopicSlug,
+    topic,
+    topicName: defaultTopic(topic).name,
+    topicDescription: defaultTopic(topic).description,
     tags: [...new Set(data.tags.map((tag: string) => tag.trim()))],
-    cover: data.cover,
+    cover,
     featured: data.featured ?? false,
     draft: data.draft,
     readingMinutes: Math.max(1, Math.ceil(chinese / 350 + words / 200)),
@@ -136,6 +141,7 @@ export async function collectArticles(
   now = new Date(),
   { includeFuture = false }: { includeFuture?: boolean } = {},
 ): Promise<SourceArticle[]> {
+  const topics = await readTopics(directory);
   const filenames = (await readdir(directory))
     .filter((name) => name.endsWith(".mdx"))
     .sort();
@@ -151,6 +157,13 @@ export async function collectArticles(
         await readFile(path.join(directory, filename), "utf8"),
         filename,
       );
+      const topic = topics.get(article.topic);
+      if (topic) {
+        article.topicName = topic.name;
+        article.topicDescription = topic.description;
+      }
+      if (!article.draft && article.cover && isLocalCover(article.cover))
+        await inspectCoverFile(directory, article.cover);
     } catch (error) {
       throw new Error(
         `${filename}: ${error instanceof Error ? error.message : "Invalid article"}`,

@@ -1,17 +1,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getArticles } from "@/lib/content";
-import { topics } from "@/lib/site";
+import { topicsForArticles } from "@/lib/topics";
 import { Icon } from "@/components/icon";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "专题",
-  description: "沿着工程实践、Web 开发和计算机基础，发现感兴趣的文章。",
+  description: "按专题浏览技术笔记，发现感兴趣的文章。",
   alternates: { canonical: "/topics" },
 };
 export default async function TopicsPage() {
   const articles = await getArticles();
+  const topics = topicsForArticles(articles);
   return (
     <main id="main-content">
       <section className="page-heading container">
@@ -27,21 +28,15 @@ export default async function TopicsPage() {
               className="topic-directory-row"
               key={topic.slug}
             >
-              <span className="topic-number">{topic.symbol}</span>
               <div>
                 <h2>{topic.name}</h2>
-                <p>{topic.description}</p>
+                {topic.description && <p>{topic.description}</p>}
               </div>
-              <span className="topic-count">
-                {
-                  articles.filter((article) => article.topic === topic.slug)
-                    .length
-                }{" "}
-                篇文章
-              </span>
+              <span className="topic-count">{topic.count} 篇文章</span>
               <Icon name="arrow" />
             </Link>
           ))}
+          {!topics.length && <p className="empty-note">新的文章，正在路上。</p>}
         </div>
       </section>
     </main>

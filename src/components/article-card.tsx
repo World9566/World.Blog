@@ -1,23 +1,25 @@
 import Link from "next/link";
 import type { Article } from "@/lib/article-types";
-import { getTopic, formatDate } from "@/lib/site";
+import { formatDate } from "@/lib/site";
 import { ArticleArt } from "./article-art";
 import { Icon } from "./icon";
 
 export function ArticleCard({ article }: { article: Article }) {
   return (
     <article className="article-card">
-      <Link
-        className="card-art-link"
-        href={`/articles/${article.slug}`}
-        tabIndex={-1}
-        aria-hidden="true"
-      >
-        <ArticleArt cover={article.cover} />
-      </Link>
+      {article.cover && (
+        <Link
+          className="card-art-link"
+          href={`/articles/${article.slug}`}
+          tabIndex={-1}
+          aria-hidden="true"
+        >
+          <ArticleArt cover={article.cover} />
+        </Link>
+      )}
       <div className="card-body">
         <Link className="category-link" href={`/topics/${article.topic}`}>
-          {getTopic(article.topic)?.name}
+          {article.topicName}
         </Link>
         <h3>
           <Link href={`/articles/${article.slug}`}>{article.title}</Link>

@@ -8,7 +8,9 @@ import {
   getArticleHistory,
 } from "@/lib/content";
 import { mdxComponentMap } from "@/mdx-components";
-import { formatDate, getSiteUrl, getTopic, site } from "@/lib/site";
+import { formatDate, getSiteUrl, site } from "@/lib/site";
+import { isPresetCover } from "@/lib/article-cover";
+import { ArticleArt } from "@/components/article-art";
 import { CopyButton } from "@/components/copy-button";
 import { TableOfContents } from "@/components/table-of-contents";
 import { ReadingProgress } from "@/components/reading-progress";
@@ -38,6 +40,9 @@ export async function generateMetadata({
       publishedTime: `${article.publishedAt}T00:00:00+08:00`,
       modifiedTime: `${article.updatedAt}T00:00:00+08:00`,
       tags: article.tags,
+      ...(article.cover && !isPresetCover(article.cover)
+        ? { images: [{ url: article.cover }] }
+        : {}),
     },
   };
 }
@@ -83,14 +88,12 @@ export default async function ArticlePage({
             />{" "}
             全部文章
           </Link>
-          <Link href={`/topics/${article.topic}`}>
-            {getTopic(article.topic)?.name}
-          </Link>
+          <Link href={`/topics/${article.topic}`}>{article.topicName}</Link>
         </div>
       </div>
       <header className="article-heading">
         <Link href={`/topics/${article.topic}`} className="category-link">
-          {getTopic(article.topic)?.name}
+          {article.topicName}
         </Link>
         <h1>{article.title}</h1>
         <p className="article-description">{article.description}</p>
@@ -111,6 +114,11 @@ export default async function ArticlePage({
           <span>{article.readingMinutes} 分钟阅读</span>
         </div>
       </header>
+      {article.cover && !isPresetCover(article.cover) && (
+        <div className="article-cover container">
+          <ArticleArt cover={article.cover} large />
+        </div>
+      )}
       <div className="article-layout container">
         <aside className="toc-column">
           <TableOfContents headings={article.headings} />

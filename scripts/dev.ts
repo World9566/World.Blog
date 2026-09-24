@@ -6,6 +6,7 @@ import path from "node:path";
 import { contentDirectory, validateContent } from "./content";
 import { syncSearch } from "./search-sync";
 import { HISTORY_FILE } from "../src/lib/article-history";
+import { contentExtrasFingerprint } from "../src/lib/content-media";
 import {
   buildArticleHistory,
   gitReader,
@@ -28,6 +29,7 @@ async function fingerprint() {
       hash.update(name).update(await readFile(path.join(directory, name)));
     }
     hash.update(await contentRevision().catch(() => "unavailable"));
+    hash.update(await contentExtrasFingerprint(directory));
     return hash.digest("hex");
   } catch (error) {
     // A missing content clone must not kill the dev server; clone the content

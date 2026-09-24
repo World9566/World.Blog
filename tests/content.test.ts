@@ -97,7 +97,7 @@ test("metadata errors fail before rendering or indexing", () => {
     [{ updatedAt: "2026-09-14" }, /updatedAt/],
     [{ slug: "../private" }, /slug/],
     [{ id: "unsafe id" }, /id/],
-    [{ topic: "missing" }, /topic/],
+    [{ topic: "../private" }, /topic/],
     [{ tags: [] }, /tags/],
     [{ featured: "true" }, /featured/],
     [{ cover: "missing" }, /cover/],

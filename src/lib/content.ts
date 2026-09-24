@@ -5,6 +5,7 @@ import type { Article } from "./article-types";
 import { collectArticles, type SourceArticle } from "./content-source";
 import { compileArticleSource, type ArticleComponent } from "./mdx-compile";
 import { publicationDate } from "./publication-date";
+import { contentExtrasFingerprint, inspectCoverFile } from "./content-media";
 import {
   historyFile,
   readArticleHistories,
@@ -64,6 +65,7 @@ async function fingerprint(directory: string): Promise<string> {
   }
   const history = await stat(historyFile(directory)).catch(() => null);
   parts.push(`history:${history?.mtimeMs ?? 0}:${history?.size ?? 0}`);
+  parts.push(await contentExtrasFingerprint(directory));
   return parts.join("|");
 }
 
@@ -169,6 +171,18 @@ export async function getArticles(): Promise<Article[]> {
 
 export async function findArticle(slug: string): Promise<Article | undefined> {
   return (await getArticles()).find((article) => article.slug === slug);
+}
+
+export async function readPublishedCover(cover: string) {
+  await ensureFresh();
+  const snapshot = state.snapshot;
+  if (!snapshot?.articles.some((article) => article.cover === cover))
+    return null;
+  const file = await inspectCoverFile(snapshot.dir, cover);
+  return {
+    contentType: file.contentType,
+    bytes: await readFile(file.filename),
+  };
 }
 
 export async function getArticleHistory(

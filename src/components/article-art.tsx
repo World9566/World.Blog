@@ -1,4 +1,6 @@
 import type { ArticleCover } from "@/lib/article-types";
+import { isPresetCover } from "@/lib/article-cover";
+import { CoverImage } from "./cover-image";
 
 export function ArticleArt({
   cover,
@@ -7,6 +9,9 @@ export function ArticleArt({
   cover: ArticleCover;
   large?: boolean;
 }) {
+  if (!cover) return null;
+  if (!isPresetCover(cover))
+    return <CoverImage key={cover} src={cover} large={large} />;
   return (
     <div
       className={`article-art art-${cover}${large ? " art-large" : ""}`}

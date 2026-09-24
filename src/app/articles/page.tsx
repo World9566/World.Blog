@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getArticles } from "@/lib/content";
-import { topics, getTopic } from "@/lib/site";
+import { topicsForArticles } from "@/lib/topics";
 import { ArticleCard } from "@/components/article-card";
 import { Pagination, PAGE_SIZE, parsePage } from "@/components/pagination";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "全部文章",
-  description: "浏览工程实践、Web 开发与计算机基础文章。",
+  description: "浏览技术笔记，按专题或标签找到感兴趣的文章。",
   alternates: { canonical: "/articles" },
 };
 export default async function ArticlesPage({
@@ -18,8 +18,10 @@ export default async function ArticlesPage({
 }) {
   const params = await searchParams;
   const articles = await getArticles();
+  const topics = topicsForArticles(articles);
   const topic =
-    typeof params.topic === "string" && getTopic(params.topic)
+    typeof params.topic === "string" &&
+    topics.some((item) => item.slug === params.topic)
       ? params.topic
       : "";
   const tag = typeof params.tag === "string" ? params.tag.slice(0, 30) : "";

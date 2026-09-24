@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { searchArticles, excerpt } from "@/lib/search";
-import { formatDate, getTopic, topics } from "@/lib/site";
+import { formatDate } from "@/lib/site";
+import { getArticles } from "@/lib/content";
+import { topicsForArticles } from "@/lib/topics";
 import { SearchForm } from "@/components/search-form";
 import { Pagination, PAGE_SIZE, parsePage } from "@/components/pagination";
 import { Icon } from "@/components/icon";
@@ -20,8 +22,10 @@ export default async function SearchPage({
   const raw = typeof params.q === "string" ? params.q.trim() : "";
   const tooLong = raw.length > 120;
   const query = raw.slice(0, 120);
+  const topics = topicsForArticles(await getArticles());
   const topic =
-    typeof params.topic === "string" && getTopic(params.topic)
+    typeof params.topic === "string" &&
+    topics.some((item) => item.slug === params.topic)
       ? params.topic
       : "";
   const result =
@@ -89,7 +93,7 @@ export default async function SearchPage({
                         href={`/topics/${article.topic}`}
                         className="category-link"
                       >
-                        {getTopic(article.topic)?.name}
+                        {article.topicName}
                       </Link>
                       <h2>
                         <Link href={`/articles/${article.slug}`}>

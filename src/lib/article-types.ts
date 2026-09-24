@@ -1,6 +1,4 @@
-import type { TopicSlug } from "./site";
-
-export type ArticleCover = "layers" | "branches" | "brackets" | "search";
+export type ArticleCover = string | null;
 export interface Heading {
   id: string;
   text: string;
@@ -13,7 +11,9 @@ export interface Article {
   description: string;
   publishedAt: string;
   updatedAt: string;
-  topic: TopicSlug;
+  topic: string;
+  topicName: string;
+  topicDescription: string;
   tags: string[];
   cover: ArticleCover;
   featured: boolean;

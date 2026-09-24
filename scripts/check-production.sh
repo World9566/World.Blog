@@ -70,9 +70,12 @@ dc run --rm --no-deps ops node --conditions=react-server --import tsx scripts/ch
 content_repo=$(mktemp -d "$ROOT/tmp/content-repo.XXXXXX")
 git init --quiet "$content_repo"
 mkdir -- "$content_repo/posts"
+mkdir -- "$content_repo/media"
+cp tests/fixtures/media/ci-cover.png "$content_repo/media/ci-cover.png"
+cp tests/fixtures/topics.json "$content_repo/topics.json"
 printf -- '%s
-'   '---'   'id: "post_bundle_check"'   'slug: "bundle-check"'   'title: "Bundle release check"'   'description: "Verifies the worktree delivery path."'   'publishedAt: "2026-01-01"'   'topic: "engineering"'   'tags: ["Test"]'   'cover: "layers"'   'draft: false'   '---'   ''   '## Published through a bundle'   ''   'This release was materialized by git worktree.'   > "$content_repo/posts/bundle-check.mdx"
-git -C "$content_repo" add posts
+'   '---'   'id: "post_bundle_check"'   'slug: "bundle-check"'   'title: "Bundle release check"'   'description: "Verifies the worktree delivery path."'   'publishedAt: "2026-01-01"'   'topic: "systems"'   'tags: ["Test"]'   'cover: "/media/ci-cover.png"'   'draft: false'   '---'   ''   '## Published through a bundle'   ''   'This release was materialized by git worktree.'   > "$content_repo/posts/bundle-check.mdx"
+git -C "$content_repo" add posts media topics.json
 git -C "$content_repo" -c user.name=ci -c user.email=ci@example.invalid commit --quiet -m "content: bundle check"
 content_sha=$(git -C "$content_repo" rev-parse HEAD)
 git -C "$content_repo" bundle create "$ROOT/tmp/content.bundle" HEAD >/dev/null
