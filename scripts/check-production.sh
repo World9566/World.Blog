@@ -80,7 +80,16 @@ bash scripts/ops/content-deploy.sh "$content_sha" < "$ROOT/tmp/content.bundle"
 rm -f -- "$ROOT/tmp/content.bundle"
 [[ "$(readlink "$CONTENT_RELEASES_DIR/current")" == "$content_sha" ]]
 [[ -f "$CONTENT_RELEASES_DIR/$content_sha/posts/bundle-check.mdx" ]]
+[[ -f "$CONTENT_RELEASES_DIR/$content_sha/.article-history.json" ]]
 dc run --rm --no-deps -e CHECK_BASE_URL=http://gateway:8080 -e "CONTENT_DIR=/content/$content_sha/posts" ops pnpm content:check
+dc run --rm --no-deps -e "EXPECTED_CONTENT_SHA=$content_sha" ops node -e '
+  fetch("http://gateway:8080/articles/bundle-check").then(async (response) => {
+    const html = await response.text();
+    if (!response.ok || !html.includes("version-history") || !html.includes(process.env.EXPECTED_CONTENT_SHA.slice(0, 8)) || !html.includes("content: bundle check"))
+      throw new Error("Published article history is missing");
+    if (html.includes("ci@example.invalid")) throw new Error("History exposed a commit email");
+  }).catch((error) => { console.error(error.message); process.exit(1); });
+'
 echo 'Content bundle delivery and worktree release checks passed.'
 # Exercise the real rollback path after both the symlink and search index
 # have switched. Only the HTTP verification command is failed; all recovery
@@ -92,10 +101,12 @@ git -C "$content_repo" -c user.name=ci -c user.email=ci@example.invalid commit -
 failed_sha=$(git -C "$content_repo" rev-parse HEAD)
 git -C "$content_repo" bundle create "$ROOT/tmp/content.bundle" HEAD >/dev/null
 export BLOG_REHEARSAL_PROJECT="$project"
+export BLOG_REHEARSAL_FAIL_MARKER="$STATE_DIR/expected-verification-failure"
 if (
   docker() {
     if [[ "$BLOG_REHEARSAL_PROJECT" == world-blog-ci-* && " $* " == *" --project-name $BLOG_REHEARSAL_PROJECT "* && " $* " == *" pnpm content:check "* ]]; then
       echo 'Intentional rehearsal verification failure.' >&2
+      touch "$BLOG_REHEARSAL_FAIL_MARKER"
       return 1
     fi
     command docker "$@"
@@ -106,6 +117,8 @@ if (
   echo 'The failed content release unexpectedly succeeded.' >&2
   exit 1
 fi
+[[ -f "$BLOG_REHEARSAL_FAIL_MARKER" ]] || { echo 'Content deploy failed before the intended rollback checkpoint.' >&2; exit 1; }
+rm -f -- "$BLOG_REHEARSAL_FAIL_MARKER"
 rm -f -- "$ROOT/tmp/content.bundle"
 [[ "$(readlink "$CONTENT_RELEASES_DIR/current")" == "$content_sha" ]]
 [[ -f "$CONTENT_RELEASES_DIR/$content_sha/posts/bundle-check.mdx" ]]

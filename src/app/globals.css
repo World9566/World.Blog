@@ -915,6 +915,113 @@ main {
 .related-container {
   max-width: 980px;
 }
+.article-history {
+  margin-top: 32px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-card);
+  font-size: 14px;
+  line-height: 1.6;
+  overflow: hidden;
+}
+.article-history summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 16px 24px;
+  list-style: none;
+  background: var(--pearl);
+}
+.article-history summary::-webkit-details-marker {
+  display: none;
+}
+.article-history summary:hover {
+  background: var(--parchment);
+}
+.history-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+}
+.history-count {
+  margin-left: auto;
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+.history-chevron {
+  flex-shrink: 0;
+  transition: transform 160ms ease;
+}
+.article-history[open] .history-chevron {
+  transform: rotate(90deg);
+}
+.article-history .history-list {
+  list-style: none;
+  padding: 8px 24px 24px;
+  margin: 0;
+}
+.article-history .history-list li {
+  position: relative;
+  padding: 20px 0 0 24px;
+  margin: 0;
+}
+.history-list li::before {
+  content: "";
+  position: absolute;
+  top: 28px;
+  left: 2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ink-muted);
+}
+.history-list li::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 40px;
+  bottom: -16px;
+  width: 1px;
+  background: var(--hairline);
+}
+.history-list li:last-child::after {
+  display: none;
+}
+.history-list li:first-child::before {
+  background: var(--primary);
+}
+.history-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+.history-latest {
+  color: var(--primary);
+}
+.article-history .history-message {
+  margin: 6px 0;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.history-version {
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+.article-history .history-version code {
+  padding: 0;
+  background: none;
+  font-size: 12px;
+}
+.article-history .history-note {
+  margin: 0;
+  padding: 0 24px 20px;
+  color: var(--ink-muted);
+  font-size: 12px;
+}
 .related-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }

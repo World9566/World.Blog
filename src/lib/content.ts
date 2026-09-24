@@ -5,6 +5,13 @@ import type { Article } from "./article-types";
 import { collectArticles, type SourceArticle } from "./content-source";
 import { compileArticleSource, type ArticleComponent } from "./mdx-compile";
 import { publicationDate } from "./publication-date";
+import {
+  historyFile,
+  readArticleHistories,
+  sourceHash,
+  type ArticleHistory,
+  type ArticleRevision,
+} from "./article-history";
 
 // Content is read at request time from a directory that deploys can switch
 // atomically (a symlink swap). Each snapshot pins one resolved release
@@ -16,6 +23,7 @@ interface Snapshot {
   articles: SourceArticle[];
   published: Article[];
   sources: Map<string, string>;
+  histories: Map<string, ArticleHistory>;
   components: Map<string, Promise<ArticleComponent>>;
   compileErrors: Map<string, string>;
   loadedAt: number;
@@ -54,6 +62,8 @@ async function fingerprint(directory: string): Promise<string> {
     const info = await stat(path.join(directory, name));
     parts.push(`${name}:${info.mtimeMs}:${info.size}`);
   }
+  const history = await stat(historyFile(directory)).catch(() => null);
+  parts.push(`history:${history?.mtimeMs ?? 0}:${history?.size ?? 0}`);
   return parts.join("|");
 }
 
@@ -76,6 +86,7 @@ async function load(): Promise<void> {
           articles: [],
           published: [],
           sources: new Map(),
+          histories: new Map(),
           components: new Map(),
           compileErrors: new Map(),
           loadedAt: Date.now(),
@@ -103,12 +114,14 @@ async function load(): Promise<void> {
         );
       }),
     );
+    const histories = await readArticleHistories(directory);
     state.snapshot = {
       dir: directory,
       fingerprint: await fingerprint(directory),
       articles: published,
       published: published.map(({ filename, draft, ...article }) => article),
       sources,
+      histories: new Map(histories.map((history) => [history.id, history])),
       components: new Map(),
       compileErrors: new Map(),
       loadedAt: Date.now(),
@@ -156,6 +169,28 @@ export async function getArticles(): Promise<Article[]> {
 
 export async function findArticle(slug: string): Promise<Article | undefined> {
   return (await getArticles()).find((article) => article.slug === slug);
+}
+
+export async function getArticleHistory(
+  slug: string,
+): Promise<{ entries: ArticleRevision[]; truncated: boolean }> {
+  await ensureFresh();
+  const snapshot = state.snapshot;
+  const article = snapshot?.articles.find((item) => item.slug === slug);
+  const history = article && snapshot?.histories?.get(article.id);
+  const source = article && snapshot?.sources.get(article.filename);
+  if (
+    !history ||
+    source === undefined ||
+    history.sourceHash !== sourceHash(source)
+  )
+    return { entries: [], truncated: false };
+  return {
+    entries: history.entries.filter(
+      (entry) => entry.publishedAt <= publicationDate(),
+    ),
+    truncated: history.truncated,
+  };
 }
 
 export async function articlesInTopic(topic: string): Promise<Article[]> {

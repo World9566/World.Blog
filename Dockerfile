@@ -23,6 +23,9 @@ RUN DATABASE_URL=postgresql://build:build@127.0.0.1:5432/build \
 RUN mkdir -p public
 
 FROM dependencies AS ops
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
 ARG REVISION=local
 LABEL org.opencontainers.image.revision=$REVISION
 ENV NODE_ENV=production

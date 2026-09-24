@@ -22,6 +22,9 @@ case "$*" in
   'pnpm content:release-check')
     [[ "$fault" != validate && -d "$releases/$selected/posts" ]]
     ;;
+  'pnpm exec tsx scripts/content-history.ts '*)
+    printf '{"version":1,"revision":"%s","articles":[]}\n' "$selected"
+    ;;
   'pnpm search:prepare')
     n=$(cat "$model/count")
     n=$((n + 1))

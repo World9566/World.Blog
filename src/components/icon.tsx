@@ -1,6 +1,11 @@
 import type { SVGProps } from "react";
 
 const paths = {
+  history: (
+    <>
+      <path d="M3 10a9 9 0 1 1 2 8M3 4v6h6M12 7v5l3 2" />
+    </>
+  ),
   heart: (
     <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z" />
   ),

@@ -1,18 +1,33 @@
 import "dotenv/config";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { readFile, readdir } from "node:fs/promises";
-import { validateContent } from "./content";
+import { readFile, readdir, rm, stat } from "node:fs/promises";
+import path from "node:path";
+import { contentDirectory, validateContent } from "./content";
 import { syncSearch } from "./search-sync";
+import { HISTORY_FILE } from "../src/lib/article-history";
+import {
+  buildArticleHistory,
+  gitReader,
+  writeArticleHistory,
+} from "./content-history";
+
+async function contentRevision() {
+  const root = path.resolve(contentDirectory(), "..");
+  if (!(await stat(path.join(root, ".git")).catch(() => null))) return "";
+  return (await gitReader(root)("rev-parse", "HEAD")).trim();
+}
 
 async function fingerprint() {
   try {
     const hash = createHash("sha256");
-    for (const name of (await readdir("content/posts"))
+    const directory = contentDirectory();
+    for (const name of (await readdir(directory))
       .filter((name) => name.endsWith(".mdx"))
       .sort()) {
-      hash.update(name).update(await readFile(`content/posts/${name}`));
+      hash.update(name).update(await readFile(path.join(directory, name)));
     }
+    hash.update(await contentRevision().catch(() => "unavailable"));
     return hash.digest("hex");
   } catch (error) {
     // A missing content clone must not kill the dev server; clone the content
@@ -23,11 +38,31 @@ async function fingerprint() {
 }
 
 async function main() {
+  // Keep generated metadata out of the separately versioned content clone.
+  process.env.CONTENT_HISTORY_FILE = path.resolve(".cache", HISTORY_FILE);
   let last = await fingerprint();
   let retrySearch = false;
+  let retryHistory = false;
   let busy = false;
   async function rebuild() {
     const articles = await validateContent({ includeFuture: true });
+    try {
+      const revision = await contentRevision();
+      if (revision)
+        await writeArticleHistory(
+          contentDirectory(),
+          await buildArticleHistory(contentDirectory(), revision),
+          process.env.CONTENT_HISTORY_FILE,
+        );
+      else await rm(process.env.CONTENT_HISTORY_FILE!, { force: true });
+      retryHistory = false;
+    } catch (error) {
+      retryHistory = true;
+      console.warn(
+        "Article history sync failed:",
+        error instanceof Error ? error.message : "",
+      );
+    }
     try {
       await syncSearch(articles);
       retrySearch = false;
@@ -51,7 +86,10 @@ async function main() {
     busy = true;
     try {
       const current = await fingerprint();
-      if (current !== last || (retrySearch && ++ticks % 30 === 0)) {
+      if (
+        current !== last ||
+        ((retrySearch || retryHistory) && ++ticks % 30 === 0)
+      ) {
         last = current;
         await rebuild();
       }

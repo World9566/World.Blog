@@ -1,7 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getArticles, findArticle, getArticleComponent } from "@/lib/content";
+import {
+  getArticles,
+  findArticle,
+  getArticleComponent,
+  getArticleHistory,
+} from "@/lib/content";
 import { mdxComponentMap } from "@/mdx-components";
 import { formatDate, getSiteUrl, getTopic, site } from "@/lib/site";
 import { CopyButton } from "@/components/copy-button";
@@ -10,6 +15,7 @@ import { ReadingProgress } from "@/components/reading-progress";
 import { ArticleCard } from "@/components/article-card";
 import { Icon } from "@/components/icon";
 import { ArticleCommunity } from "@/components/article-community";
+import { ArticleHistory } from "@/components/article-history";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata({
@@ -44,6 +50,7 @@ export default async function ArticlePage({
   if (!article) notFound();
   const Content = await getArticleComponent(article.slug);
   if (!Content) notFound();
+  const history = await getArticleHistory(article.slug);
   const articles = await getArticles();
   const related = articles
     .filter((item) => item.id !== article.id)
@@ -128,6 +135,7 @@ export default async function ArticlePage({
               </p>
             )}
           </div>
+          <ArticleHistory {...history} />
         </article>
       </div>
       <ArticleCommunity articleId={article.id} slug={article.slug} />

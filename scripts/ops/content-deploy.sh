@@ -160,6 +160,23 @@ release_check() {
   write_ready "$release"
 }
 
+prepare_history() {
+  local sha=$1 output
+  output="$RELEASES/$sha/.article-history.json.new"
+  # Only the maintenance command can read Git objects. Web receives a small
+  # metadata sidecar in the same immutable release as the article sources.
+  if ! dc run -T --rm --no-deps \
+    --user "$(id -u):$(id -g)" \
+    -v "$(host_path "$REPO/.git"):/content-git:ro" \
+    -e CONTENT_GIT_DIR=/content-git -e "CONTENT_DIR=/content/$sha/posts" \
+    ops pnpm exec tsx scripts/content-history.ts "$sha" > "$output"; then
+    rm -f -- "$output"
+    return 1
+  fi
+  chmod 644 "$output"
+  mv -Tf -- "$output" "$RELEASES/$sha/.article-history.json"
+}
+
 prepare_search() {
   local sha=$1 output temp
   output=$(dc run --rm --no-deps -e "CONTENT_DIR=/content/$sha/posts" ops pnpm search:prepare)
@@ -326,6 +343,7 @@ if [[ "$ensure_mode" == 1 ]]; then
     exit 0
   fi
   release_check "$target"
+  prepare_history "$target"
   # Rebuild with this image's search schema, including scheduled articles.
   dc run --rm --no-deps ops pnpm search:sync
   prune_cache
@@ -336,6 +354,7 @@ fi
 sha=$1
 materialize "$sha"
 release_check "$sha"
+prepare_history "$sha"
 prepare_search "$sha"
 
 journal_write "$sha" "$index_name"
