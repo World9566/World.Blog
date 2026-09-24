@@ -36,7 +36,7 @@ export function ArticleArt({
               className="art-edge"
             />
             <path d="m159 98 81-41 81 41-81 41Z" opacity=".35" />
-            <path d="m199 98 41-21 41 21-41 21Z" opacity=".5" />
+            <path d="m199 98 41-21 41 21-41 21Z" className="art-highlight" />
             <path d="M240 279v12M389 204l13 7M78 211l13-7" opacity=".35" />
           </g>
         )}
@@ -45,6 +45,7 @@ export function ArticleArt({
             <path
               d="M113 235V60M113 187c0-76 158-4 158-87V65M271 100c0 58 95 5 95 81v54"
               strokeWidth="3"
+              className="art-highlight"
             />
             {[
               [113, 65],
@@ -88,6 +89,7 @@ export function ArticleArt({
               strokeWidth="5"
               strokeLinecap="round"
               strokeLinejoin="round"
+              className="art-highlight"
             />
             <path d="M189 220h102" opacity=".2" strokeWidth="4" />
           </g>
@@ -107,7 +109,12 @@ export function ArticleArt({
               opacity=".3"
               strokeWidth="4"
             />
-            <circle cx="301" cy="144" r="54" className="art-face" />
+            <circle
+              cx="301"
+              cy="144"
+              r="54"
+              className="art-face art-highlight"
+            />
             <path d="m340 183 50 50" strokeWidth="13" strokeLinecap="round" />
             <circle cx="301" cy="144" r="40" opacity=".35" />
             <path d="M277 144h48M301 120v48" opacity=".4" />

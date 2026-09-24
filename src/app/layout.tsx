@@ -24,7 +24,15 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="zh-CN" data-scroll-behavior="smooth">
+    <html lang="zh-CN" data-scroll-behavior="smooth" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{document.documentElement.dataset.theme=localStorage.getItem('world-theme')==='dark'?'dark':'light'}catch{document.documentElement.dataset.theme='light'}",
+          }}
+        />
+      </head>
       <body>
         <SiteHeader />
         {children}

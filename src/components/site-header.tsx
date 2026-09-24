@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { site } from "@/lib/site";
 import { Icon } from "./icon";
 import { AuthNav } from "./auth-nav";
+import { ThemeToggle } from "./theme-toggle";
 
 const navigation = [
   { href: "/articles", name: "文章" },
@@ -79,6 +80,7 @@ export function SiteHeader() {
             <span>搜索</span>
             <kbd>/</kbd>
           </Link>
+          <ThemeToggle />
           <AuthNav onNavigate={() => setOpen(false)} />
           <button
             ref={menu}
