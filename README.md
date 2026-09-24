@@ -317,6 +317,8 @@ curl --fail http://127.0.0.1:8080/api/health
 
 停站前先逐个拉取镜像，以减少同时访问镜像源的连接数。每次拉取最多等待 180 秒，每个镜像最多尝试 3 次，全部下载共用 600 秒预算；超时会断开本次拉取并自动重试，强制结束进程最多额外等待 15 秒。下载失败不会停止现有服务或执行数据库迁移。日志会显示镜像地址、尝试次数和超时原因；应用和维护镜像都会核对提交版本。镜像源持续故障仍会使部署失败，重跑不会跳过镜像完整性检查。
 
+需要 `sudo` 操作 Docker 时，超时监控也在 `sudo` 内运行，以便结束 root 身份的拉取进程。`timeout sudo docker ...` 无法可靠清理这类进程；脚本使用 `sudo -n timeout ... docker ...`，并记录实际发出的 TERM/KILL 信号。重试只处理下载连接异常，不能保证镜像源回源或首次缓存加速。
+
 手动运维时可通过命令环境变量调整 `BLOG_PULL_ATTEMPT_TIMEOUT`、`BLOG_PULL_TOTAL_TIMEOUT`、`BLOG_PULL_ATTEMPTS`、`BLOG_PULL_RETRY_DELAY`（时间单位为秒），不要添加到 `.env.production`。GitHub deploy job 的 20 分钟总时限仍然生效。
 
 ### 发布文章

@@ -98,6 +98,19 @@ exit 9
 function run(fault = "", options: Record<string, string> = {}) {
   const root = mkdtempSync(path.join(os.tmpdir(), "blog-pull-test-"));
   try {
+    mkdirSync(path.join(root, "bin"));
+    // No privilege changes in the test suite. Require the monitor to be
+    // inside sudo, then execute real GNU timeout and the pull fixture.
+    writeFileSync(
+      path.join(root, "bin/sudo"),
+      `#!/usr/bin/env bash
+set -eu
+[[ "$1 $2" == '-n timeout' ]] || { echo 'timeout must run inside sudo' >&2; exit 90; }
+shift
+exec "$@"
+`,
+      { mode: 0o755 },
+    );
     const result = spawnSync(
       "bash",
       [
@@ -106,6 +119,7 @@ function run(fault = "", options: Record<string, string> = {}) {
 set -euo pipefail
 source scripts/ops/pull-images.sh
 DOCKER=(bash tests/fixtures/pull-docker.sh)
+if [[ "\${TEST_SUDO:-}" == 1 ]]; then DOCKER=(sudo -n "\${DOCKER[@]}"); fi
 dc() {
   if [[ "\${TEST_CONFIG_FAILURE:-}" == 1 ]]; then return 42; fi
   printf '%s\\n' ghcr.nju.edu.cn/test/web ghcr.nju.edu.cn/test/ops ghcr.nju.edu.cn/test/web
@@ -119,6 +133,7 @@ echo ready-to-deploy
         timeout: 15000,
         env: {
           ...process.env,
+          PATH: `${root}/bin:${process.env.PATH}`,
           TEST_ROOT: root,
           TEST_FAULT: fault,
           BLOG_PULL_ATTEMPT_TIMEOUT: "1",
@@ -175,6 +190,24 @@ test(
     const result = run("stalled");
     assert.equal(result.status, 0, result.output);
     assert.match(result.output, /timed out/);
+    assert.match(
+      result.events,
+      /cancel ghcr.nju.edu.cn\/test\/web 1\nstart ghcr.nju.edu.cn\/test\/web 2/,
+    );
+    assert.match(
+      result.events,
+      /cancel ghcr.nju.edu.cn\/test\/ops 1\nstart ghcr.nju.edu.cn\/test\/ops 2/,
+    );
+  },
+);
+
+test(
+  "sudo runs the timeout monitor and cancels the pull before retrying",
+  { skip: !linux },
+  () => {
+    const result = run("stalled", { TEST_SUDO: "1" });
+    assert.equal(result.status, 0, result.output);
+    assert.match(result.output, /sending signal TERM/);
     assert.match(
       result.events,
       /cancel ghcr.nju.edu.cn\/test\/web 1\nstart ghcr.nju.edu.cn\/test\/web 2/,

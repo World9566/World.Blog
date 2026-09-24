@@ -9,6 +9,16 @@ pull_images() {
   local retry_delay=${BLOG_PULL_RETRY_DELAY:-5}
   local value listing deadline image attempt remaining allowance result delay
   local -A seen=()
+  local -a pull_timeout=(timeout --verbose --signal=TERM --kill-after=15s)
+  local -a pull_docker=("${DOCKER[@]}")
+  # timeout must have permission to signal the actual Docker client. Running
+  # `timeout sudo docker` can kill the monitor while leaving a root-owned
+  # pull alive, so each retry joins the same stuck daemon-side download.
+  # common.sh uses either (docker) or (sudo -n docker).
+  if [[ "${DOCKER[0]}" == sudo && "${DOCKER[1]:-}" == -n ]]; then
+    pull_timeout=(sudo -n "${pull_timeout[@]}")
+    pull_docker=("${DOCKER[@]:2}")
+  fi
   for value in "$attempt_timeout" "$total_timeout" "$attempts"; do
     [[ "$value" =~ ^[1-9][0-9]{0,4}$ ]] || { echo 'Invalid image pull timeout or attempt count.' >&2; return 1; }
   done
@@ -31,7 +41,7 @@ pull_images() {
       printf 'Pulling %s (attempt %s/%s, timeout %ss)\n' "$image" "$attempt" "$attempts" "$allowance"
       # Terminate the client connection and allow Docker to cancel this pull.
       # The daemon and the currently running containers are never restarted.
-      if timeout --signal=TERM --kill-after=15s "${allowance}s" "${DOCKER[@]}" image pull "$image"; then
+      if "${pull_timeout[@]}" "${allowance}s" "${pull_docker[@]}" image pull "$image"; then
         break
       else
         result=$?
