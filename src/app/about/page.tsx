@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { site } from "@/lib/site";
 import { Icon } from "@/components/icon";
+import { HeroArtwork } from "@/components/hero-artwork";
 
 export const metadata: Metadata = {
   title: "关于",
@@ -12,6 +13,7 @@ export default function AboutPage() {
   return (
     <main id="main-content">
       <section className="page-heading container about-heading">
+        <HeroArtwork />
         <span className="about-monogram" aria-hidden="true">
           w.
         </span>

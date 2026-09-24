@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { getArticles } from "@/lib/content";
 import { topicsForArticles } from "@/lib/topics";
 import { ArticleCard } from "@/components/article-card";
+import { HeroArtwork } from "@/components/hero-artwork";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata({
@@ -36,6 +37,7 @@ export default async function TopicPage({
   return (
     <main id="main-content">
       <section className="page-heading container">
+        <HeroArtwork />
         <Link className="eyebrow" href="/topics">
           全部专题
         </Link>

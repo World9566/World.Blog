@@ -4,6 +4,7 @@ import { getArticles } from "@/lib/content";
 import { topicsForArticles } from "@/lib/topics";
 import { ArticleCard } from "@/components/article-card";
 import { Pagination, PAGE_SIZE, parsePage } from "@/components/pagination";
+import { HeroArtwork } from "@/components/hero-artwork";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -37,6 +38,7 @@ export default async function ArticlesPage({
   return (
     <main id="main-content" className="archive-page">
       <section className="page-heading container">
+        <HeroArtwork layers={false} />
         <p className="eyebrow">慢慢积累，常常回看</p>
         <h1>全部文章。</h1>
         <p>关于工具、代码，以及背后的原理。</p>

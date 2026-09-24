@@ -3,6 +3,8 @@ import Link from "next/link";
 import { getArticles } from "@/lib/content";
 import { topicsForArticles } from "@/lib/topics";
 import { Icon } from "@/components/icon";
+import { HeroArtwork } from "@/components/hero-artwork";
+import { TopicArtwork } from "@/components/topic-artwork";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -16,6 +18,7 @@ export default async function TopicsPage() {
   return (
     <main id="main-content">
       <section className="page-heading container">
+        <HeroArtwork />
         <p className="eyebrow">沿着一条线，读深一点</p>
         <h1>循着兴趣，探索。</h1>
         <p>把相关的问题，放在一起思考。</p>
@@ -28,6 +31,7 @@ export default async function TopicsPage() {
               className="topic-directory-row"
               key={topic.slug}
             >
+              <TopicArtwork slug={topic.slug} />
               <div>
                 <h2>{topic.name}</h2>
                 {topic.description && <p>{topic.description}</p>}

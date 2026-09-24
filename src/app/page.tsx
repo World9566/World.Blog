@@ -4,6 +4,8 @@ import { topicsForArticles } from "@/lib/topics";
 import { ArticleArt } from "@/components/article-art";
 import { ArticleCard } from "@/components/article-card";
 import { Icon } from "@/components/icon";
+import { HeroArtwork } from "@/components/hero-artwork";
+import { TopicArtwork } from "@/components/topic-artwork";
 
 export const dynamic = "force-dynamic";
 export default async function Home() {
@@ -16,6 +18,7 @@ export default async function Home() {
   return (
     <main id="main-content">
       <section className="home-hero container">
+        <HeroArtwork />
         <p className="eyebrow">技术笔记</p>
         <h1>
           技术，值得
@@ -107,6 +110,7 @@ export default async function Home() {
                   key={topic.slug}
                   className="topic-card"
                 >
+                  <TopicArtwork slug={topic.slug} />
                   <h3>{topic.name}</h3>
                   {topic.description && <p>{topic.description}</p>}
                   <span className="topic-bottom">
