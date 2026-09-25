@@ -4,6 +4,13 @@ import { SiteFooter } from "@/components/site-footer";
 import { getSiteUrl, site } from "@/lib/site";
 import "./globals.css";
 
+const themeInitScript = `
+(() => {
+  const theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  document.documentElement.dataset.theme = theme;
+  document.querySelector('meta[name="color-scheme"]')?.setAttribute("content", theme);
+})();`;
+
 export const metadata: Metadata = {
   metadataBase: getSiteUrl(),
   title: { default: site.title, template: `%s · ${site.name}` },
@@ -26,12 +33,8 @@ export default function RootLayout({
   return (
     <html lang="zh-CN" data-scroll-behavior="smooth" suppressHydrationWarning>
       <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html:
-              "try{document.documentElement.dataset.theme=localStorage.getItem('world-theme')==='dark'?'dark':'light'}catch{document.documentElement.dataset.theme='light'}",
-          }}
-        />
+        <meta name="color-scheme" content="light" />
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body>
         <SiteHeader />

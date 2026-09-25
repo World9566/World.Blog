@@ -15,8 +15,7 @@ const paths = {
   ),
   github: (
     <path
-      fill="currentColor"
-      stroke="none"
+      className="icon-fill"
       d="M12 .8a11.3 11.3 0 0 0-3.57 22.02c.56.1.77-.24.77-.54v-2.1c-3.15.68-3.82-1.34-3.82-1.34-.51-1.3-1.26-1.65-1.26-1.65-1.03-.7.08-.69.08-.69 1.14.08 1.74 1.17 1.74 1.17 1.02 1.74 2.66 1.24 3.31.94.1-.73.4-1.24.73-1.52-2.51-.28-5.15-1.26-5.15-5.59 0-1.23.44-2.24 1.16-3.03-.12-.28-.5-1.43.11-2.99 0 0 .95-.3 3.1 1.16a10.8 10.8 0 0 1 5.65 0c2.15-1.46 3.1-1.16 3.1-1.16.61 1.56.23 2.71.11 2.99.72.79 1.16 1.8 1.16 3.03 0 4.34-2.65 5.3-5.17 5.58.41.36.77 1.04.77 2.1v3.1c0 .3.2.65.78.54A11.3 11.3 0 0 0 12 .8Z"
     />
   ),
@@ -66,18 +65,15 @@ const paths = {
 
 export function Icon({
   name,
+  className,
   ...props
 }: SVGProps<SVGSVGElement> & { name: keyof typeof paths }) {
   return (
     <svg
+      className={["site-icon", className].filter(Boolean).join(" ")}
       width="20"
       height="20"
       viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
       aria-hidden="true"
       {...props}
     >

@@ -17,9 +17,9 @@ export function ArticleArt({
       className={`article-art art-${cover}${large ? " art-large" : ""}`}
       aria-hidden="true"
     >
-      <svg viewBox="0 0 480 300" fill="none">
+      <svg viewBox="0 0 480 300">
         {cover === "layers" && (
-          <g stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round">
+          <g strokeWidth="1.2" strokeLinejoin="round">
             <path d="m91 190 149-75 149 75-149 75Z" className="art-face" />
             <path
               d="m91 190 149 75 149-75v14l-149 75-149-75Z"
@@ -41,7 +41,7 @@ export function ArticleArt({
           </g>
         )}
         {cover === "branches" && (
-          <g stroke="currentColor" strokeWidth="2">
+          <g strokeWidth="2">
             <path
               d="M113 235V60M113 187c0-76 158-4 158-87V65M271 100c0 58 95 5 95 81v54"
               strokeWidth="3"
@@ -71,7 +71,7 @@ export function ArticleArt({
           </g>
         )}
         {cover === "brackets" && (
-          <g stroke="currentColor" strokeWidth="1.2">
+          <g strokeWidth="1.2">
             <rect
               x="83"
               y="46"
@@ -95,7 +95,7 @@ export function ArticleArt({
           </g>
         )}
         {cover === "search" && (
-          <g stroke="currentColor" strokeWidth="1.5">
+          <g strokeWidth="1.5">
             <rect
               x="80"
               y="67"
