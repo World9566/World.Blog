@@ -6,6 +6,7 @@ import { ArticleCard } from "@/components/article-card";
 import { Icon } from "@/components/icon";
 import { HeroArtwork } from "@/components/hero-artwork";
 import { TopicArtwork } from "@/components/topic-artwork";
+import { formatDate } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 export default async function Home() {
@@ -72,7 +73,10 @@ export default async function Home() {
           </div>
         </section>
       )}
-      <section className="section section-parchment" id="articles">
+      <section
+        className="section section-parchment home-recent-section"
+        id="articles"
+      >
         <div className="container">
           <div className="section-heading">
             <div>
@@ -84,10 +88,36 @@ export default async function Home() {
             </Link>
           </div>
           {latest.length ? (
-            <div className="article-grid">
-              {latest.map((article) => (
-                <ArticleCard key={article.id} article={article} />
-              ))}
+            <div className={`home-bento home-bento-${latest.length}`}>
+              {latest.map((article, index) =>
+                index === 0 ? (
+                  <div
+                    className={`home-bento-lead${article.cover ? "" : " home-bento-lead-text-only"}`}
+                    key={article.id}
+                  >
+                    <ArticleCard article={article} />
+                  </div>
+                ) : (
+                  <article className="home-bento-compact" key={article.id}>
+                    <Link
+                      href={`/articles/${article.slug}`}
+                      className="home-bento-compact-link"
+                    >
+                      <div className="home-bento-compact-copy">
+                        <h3>{article.title}</h3>
+                        <time dateTime={article.publishedAt}>
+                          {formatDate(article.publishedAt)}
+                        </time>
+                      </div>
+                      {article.cover && (
+                        <div className="home-bento-compact-art">
+                          <ArticleArt cover={article.cover} />
+                        </div>
+                      )}
+                    </Link>
+                  </article>
+                ),
+              )}
             </div>
           ) : (
             <p className="empty-note">新的思考，正在路上。</p>
@@ -95,7 +125,7 @@ export default async function Home() {
         </div>
       </section>
       {topics.length > 0 && (
-        <section className="section">
+        <section className="section home-topics-section">
           <div className="container">
             <div className="section-heading">
               <div>
@@ -103,19 +133,20 @@ export default async function Home() {
                 <h2>找到你的下一篇。</h2>
               </div>
             </div>
-            <div className="topic-grid">
+            <div className="home-topic-pills">
               {topics.map((topic) => (
                 <Link
                   href={`/topics/${topic.slug}`}
                   key={topic.slug}
-                  className="topic-card"
+                  className="home-topic-pill"
+                  aria-label={`${topic.name}，${topic.count} 篇文章${topic.description ? `。${topic.description}` : ""}`}
                 >
                   <TopicArtwork slug={topic.slug} />
-                  <h3>{topic.name}</h3>
-                  {topic.description && <p>{topic.description}</p>}
-                  <span className="topic-bottom">
-                    {topic.count} 篇文章 <Icon name="arrow" />
+                  <span className="home-topic-pill-name">{topic.name}</span>
+                  <span className="home-topic-pill-count">
+                    {topic.count} 篇文章
                   </span>
+                  <Icon name="arrow" width="17" height="17" />
                 </Link>
               ))}
             </div>
