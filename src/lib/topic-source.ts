@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { Topic } from "./topics";
+import { isPresetCover, parseCover } from "./article-cover";
 
 export async function readTopics(
   directory: string,
@@ -42,10 +43,20 @@ export async function readTopics(
       throw new Error(`Invalid topic description: ${item.slug}`);
     if (topics.has(item.slug))
       throw new Error(`Duplicate topic slug: ${item.slug}`);
+    let cover: string | null;
+    try {
+      cover = parseCover(item.cover);
+      if (cover && isPresetCover(cover)) throw new Error("Expected an image");
+    } catch {
+      throw new Error(
+        `Invalid topic cover (${item.slug}): use /media/image.webp, an HTTPS URL, or omit cover`,
+      );
+    }
     topics.set(item.slug, {
       slug: item.slug,
       name: item.name.trim(),
       description: item.description?.trim() ?? "",
+      cover,
     });
   }
   return topics;

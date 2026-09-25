@@ -126,6 +126,187 @@ test("topics come only from published articles and optional content-owned names"
   }
 });
 
+test("topic covers accept local and HTTPS images and reject unsupported forms", async () => {
+  const f = await fixture();
+  const filename = path.join(f.root, "topics.json");
+  try {
+    for (const cover of [
+      undefined,
+      null,
+      "",
+      "/media/cover.png",
+      "https://images.example.com/topic.webp",
+    ]) {
+      await writeFile(
+        filename,
+        JSON.stringify([{ slug: "systems", name: "系统笔记", cover }]),
+      );
+      assert.equal(
+        (await readTopics(f.directory)).get("systems")?.cover,
+        cover || null,
+      );
+    }
+    for (const cover of [
+      "layers",
+      "cube",
+      "media/cover.png",
+      "/media/../secret.png",
+      "/media/%2e%2e/secret.png",
+      "/media/topic.svg",
+      "http://example.com/a.png",
+      "https://user:secret@example.com/a.png",
+      "data:image/png;base64,AA",
+      "javascript:alert(1)",
+      12,
+      {},
+    ]) {
+      await writeFile(
+        filename,
+        JSON.stringify([{ slug: "systems", name: "系统笔记", cover }]),
+      );
+      await assert.rejects(
+        readTopics(f.directory),
+        /Invalid topic cover \(systems\)/,
+      );
+    }
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("publication validates topic image files, including scheduled articles", async () => {
+  const f = await fixture();
+  try {
+    const topicFile = path.join(f.root, "topics.json");
+    const postFile = path.join(f.directory, "first.mdx");
+    await writeFile(
+      topicFile,
+      JSON.stringify([
+        { slug: "systems", name: "系统笔记", cover: "/media/missing.png" },
+      ]),
+    );
+    await writeFile(postFile, article("first", { draft: true }));
+    assert.deepEqual(await collectArticles(f.directory), []);
+    await writeFile(postFile, article("first"));
+    await assert.rejects(
+      collectArticles(f.directory),
+      /first.mdx.*missing.png/,
+    );
+    await writeFile(path.join(f.root, "media", "missing.png"), "not an image");
+    await assert.rejects(collectArticles(f.directory), /image extension/);
+    await symlink(
+      path.join(f.root, "media", "cover.png"),
+      path.join(f.root, "media", "link.png"),
+    );
+    await writeFile(
+      topicFile,
+      JSON.stringify([
+        { slug: "systems", name: "系统笔记", cover: "/media/link.png" },
+      ]),
+    );
+    await assert.rejects(collectArticles(f.directory), /regular file/);
+    await writeFile(
+      topicFile,
+      JSON.stringify([
+        { slug: "systems", name: "系统笔记", cover: "/media/cover.png" },
+      ]),
+    );
+    const current = await collectArticles(f.directory);
+    assert.equal(current[0].cover, null);
+    assert.equal(current[0].topicCover, "/media/cover.png");
+    assert.equal(topicsForArticles(current)[0].cover, "/media/cover.png");
+    await writeFile(postFile, article("first", { publishedAt: "2099-01-01" }));
+    await writeFile(
+      topicFile,
+      JSON.stringify([
+        { slug: "systems", name: "系统笔记", cover: "/media/not-ready.png" },
+      ]),
+    );
+    await assert.rejects(collectArticles(f.directory), /not-ready.png/);
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("topic media follows published topics, metadata edits, release switches and publication day", async (t) => {
+  const first = await fixture(),
+    second = await fixture();
+  const saved = process.env.CONTENT_DIR;
+  t.mock.timers.enable({
+    apis: ["Date"],
+    now: new Date("2026-09-25T00:00:00Z"),
+  });
+  try {
+    process.env.CONTENT_DIR = first.directory;
+    const topics = [
+      { slug: "systems", name: "系统笔记", cover: "/media/cover.png" },
+      { slug: "empty", name: "空专题", cover: "/media/empty.png" },
+      { slug: "private", name: "草稿专题", cover: "/media/private.png" },
+      { slug: "upcoming", name: "未来专题", cover: "/media/future.png" },
+    ];
+    for (const name of ["empty", "private", "future", "replacement"]) {
+      await copyFile(
+        path.join(first.root, "media", "cover.png"),
+        path.join(first.root, "media", `${name}.png`),
+      );
+    }
+    const topicFile = path.join(first.root, "topics.json");
+    await writeFile(topicFile, JSON.stringify(topics));
+    await writeFile(
+      path.join(first.directory, "current.mdx"),
+      article("current"),
+    );
+    await writeFile(
+      path.join(first.directory, "draft.mdx"),
+      article("draft", { topic: "private", draft: true }),
+    );
+    await writeFile(
+      path.join(first.directory, "future.mdx"),
+      article("future", { topic: "upcoming", publishedAt: "2099-01-01" }),
+    );
+    const media = (name: string) =>
+      GET(new Request(`http://localhost/media/${name}.png`), {
+        params: Promise.resolve({ path: [`${name}.png`] }),
+      });
+    await refreshContent();
+    assert.equal((await media("cover")).status, 200);
+    for (const name of ["empty", "private", "future"])
+      assert.equal((await media(name)).status, 404);
+    topics[0].cover = "/media/replacement.png";
+    await writeFile(topicFile, JSON.stringify(topics));
+    t.mock.timers.setTime(Date.parse("2026-09-25T00:00:02Z"));
+    assert.equal(
+      topicsForArticles(await getArticles())[0].cover,
+      "/media/replacement.png",
+    );
+    assert.equal((await media("cover")).status, 404);
+    const image = await media("replacement");
+    assert.equal(image.status, 200);
+    assert.equal(image.headers.get("content-type"), "image/png");
+    assert.equal(image.headers.get("cache-control"), "no-store");
+    assert.ok((await image.arrayBuffer()).byteLength > 0);
+    process.env.CONTENT_DIR = second.directory;
+    await writeFile(
+      path.join(second.directory, "second.mdx"),
+      article("second"),
+    );
+    await refreshContent();
+    assert.equal((await media("replacement")).status, 404);
+    process.env.CONTENT_DIR = first.directory;
+    await refreshContent();
+    assert.equal((await media("replacement")).status, 200);
+    t.mock.timers.setTime(Date.parse("2098-12-31T16:00:02Z"));
+    assert.equal((await media("future")).status, 200);
+    assert.equal((await media("empty")).status, 404);
+    assert.equal((await media("private")).status, 404);
+  } finally {
+    if (saved === undefined) delete process.env.CONTENT_DIR;
+    else process.env.CONTENT_DIR = saved;
+    await first.cleanup();
+    await second.cleanup();
+  }
+});
+
 test("local covers fail publication on missing, disguised or linked files", async () => {
   const f = await fixture();
   try {

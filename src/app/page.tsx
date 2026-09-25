@@ -159,7 +159,7 @@ export default async function Home() {
                   className="home-topic-pill"
                   aria-label={`${topic.name}，${topic.count} 篇文章${topic.description ? `。${topic.description}` : ""}`}
                 >
-                  <TopicArtwork slug={topic.slug} />
+                  <TopicArtwork slug={topic.slug} cover={topic.cover} />
                   <span className="home-topic-pill-name">{topic.name}</span>
                   <span className="home-topic-pill-count">
                     {topic.count} 篇文章

@@ -6,6 +6,7 @@ import { topicsForArticles } from "@/lib/topics";
 import { ArticleCard } from "@/components/article-card";
 import { HeroArtwork } from "@/components/hero-artwork";
 import { Icon } from "@/components/icon";
+import { TopicArtwork } from "@/components/topic-artwork";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata({
@@ -60,7 +61,12 @@ export default async function TopicPage({
       </nav>
       <section className="page-heading container">
         <HeroArtwork layers={false} />
-        <h1>{topic.name}</h1>
+        <div className="topic-heading-title">
+          {topic.cover && (
+            <TopicArtwork slug={topic.slug} cover={topic.cover} />
+          )}
+          <h1>{topic.name}</h1>
+        </div>
         {topic.description && <p>{topic.description}</p>}
         <span className="heading-count">{articles.length} 篇文章</span>
       </section>

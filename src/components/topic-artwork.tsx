@@ -1,4 +1,12 @@
-export function TopicArtwork({ slug }: { slug: string }) {
+import { TopicCoverImage } from "./topic-cover-image";
+
+export function TopicArtwork({
+  slug,
+  cover,
+}: {
+  slug: string;
+  cover?: string | null;
+}) {
   const kind =
     slug === "fundamentals"
       ? "cube"
@@ -8,7 +16,7 @@ export function TopicArtwork({ slug }: { slug: string }) {
           ? "code"
           : "cube";
 
-  return (
+  const artwork = (
     <span className={`topic-artwork topic-artwork-${kind}`} aria-hidden="true">
       <svg viewBox="0 0 80 80" focusable="false">
         {kind === "cube" && (
@@ -41,5 +49,10 @@ export function TopicArtwork({ slug }: { slug: string }) {
         )}
       </svg>
     </span>
+  );
+  return cover ? (
+    <TopicCoverImage key={cover} src={cover} fallback={artwork} />
+  ) : (
+    artwork
   );
 }

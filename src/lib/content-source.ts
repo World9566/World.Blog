@@ -136,6 +136,7 @@ export function parseArticle(source: string, filename: string): SourceArticle {
     topic,
     topicName: defaultTopic(topic).name,
     topicDescription: defaultTopic(topic).description,
+    topicCover: null,
     tags: [...new Set(data.tags.map((tag: string) => tag.trim()))],
     cover,
     featured: data.featured ?? false,
@@ -158,6 +159,7 @@ export async function collectArticles(
   const all: SourceArticle[] = [];
   const ids = new Set<string>();
   const slugs = new Set<string>();
+  const inspectedCovers = new Set<string>();
   for (const filename of filenames) {
     if (!/^[a-z0-9-]+\.mdx$/.test(filename))
       throw new Error(`Invalid article filename: ${filename}`);
@@ -171,9 +173,16 @@ export async function collectArticles(
       if (topic) {
         article.topicName = topic.name;
         article.topicDescription = topic.description;
+        article.topicCover = topic.cover;
       }
-      if (!article.draft && article.cover && isLocalCover(article.cover))
-        await inspectCoverFile(directory, article.cover);
+      if (!article.draft) {
+        for (const cover of [article.cover, article.topicCover]) {
+          if (cover && isLocalCover(cover) && !inspectedCovers.has(cover)) {
+            await inspectCoverFile(directory, cover);
+            inspectedCovers.add(cover);
+          }
+        }
+      }
     } catch (error) {
       throw new Error(
         `${filename}: ${error instanceof Error ? error.message : "Invalid article"}`,

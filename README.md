@@ -210,19 +210,22 @@ draft: true
 
 ### 自定义专题与封面
 
-在**内容仓库根目录**添加可选的 `topics.json`，设置专题的显示名称和介绍；修改后随内容正常提交发布，无需改动应用代码：
+在**内容仓库根目录**添加可选的 `topics.json`，设置专题的显示名称、介绍和配图；修改后随内容正常提交发布，无需改动应用代码：
 
 ```json
 [
   {
     "slug": "machine-learning",
     "name": "机器学习",
-    "description": "从模型原理到训练实践。"
+    "description": "从模型原理到训练实践。",
+    "cover": "/media/topics/machine-learning.webp"
   }
 ]
 ```
 
 文章中填写 `topic: "machine-learning"` 即归入这个专题。未配置的专题显示其标识；原有三个专题保留默认中文名称，也可在这里覆盖。没有已发布文章的专题不会显示在列表、筛选或站点地图中。
+
+专题的 `cover` 支持以 `/media/` 开头的本地图片路径或 HTTPS 图片地址，规则与文章自定义图片相同。配图显示在首页专题入口、专题列表和专题详情页，按正方形居中裁切，建议使用主体居中的方图。省略、设为 `null` 或空字符串时沿用默认图标；外部图片加载失败也回退到默认图标。专题图片与文章封面独立配置。首次使用此字段前，先部署支持专题配图的应用版本。
 
 自带图片放在内容仓库的 `media/` 下，与 `posts/` 同级。例如：
 
@@ -230,9 +233,10 @@ draft: true
 posts/my-first-article.mdx
 topics.json
 media/covers/docker.webp
+media/topics/machine-learning.webp
 ```
 
-在文章 frontmatter 中设置 `cover: "/media/covers/docker.webp"`，或 `cover: "https://images.example.com/docker.webp"`。自带图片支持 PNG、JPEG、WebP、GIF、AVIF，单张不超过 10 MB，文件路径使用英文字母、数字、点、下划线和 ASCII hyphen。发布时会检查文件存在、类型和路径；封面随内容一起发布、回滚，无需重建镜像。仅公开已发布文章引用的图片，专用于草稿的图片不会开放访问。外部图片由读者浏览器直接加载。
+在文章 frontmatter 中设置 `cover: "/media/covers/docker.webp"`，或 `cover: "https://images.example.com/docker.webp"`。自带图片支持 PNG、JPEG、WebP、GIF、AVIF，单张不超过 10 MB，文件路径使用英文字母、数字、点、下划线和 ASCII hyphen。发布时会检查非草稿文章及其专题引用的图片是否存在、类型和路径是否合法；封面随内容一起发布、回滚，无需重建镜像。仅公开已发布文章及其专题引用的图片，专用于草稿、未到发布时间的专题或空专题的图片不会开放访问。外部图片由读者浏览器直接加载。
 
 自定义图片显示在首页、文章卡片和文章详情页，并用于文章分享预览；旧的内置图形保留原有展示位置。未设置封面时直接展示标题和摘要。
 

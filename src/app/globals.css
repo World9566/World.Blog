@@ -1080,6 +1080,15 @@ main {
 .topic-artwork-cube {
   background: linear-gradient(135deg, #e6f2ff, #dfe8ff);
 }
+.topic-artwork-image {
+  overflow: hidden;
+}
+.topic-artwork-image img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
 .topic-artwork-layers {
   background: linear-gradient(135deg, #e1f8f3, #dbeefb);
 }
@@ -1308,6 +1317,16 @@ main {
 }
 .topic-detail-page .heading-count {
   margin-top: 8px;
+}
+.topic-heading-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+.topic-heading-title h1 {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .topic-section {
   padding-block: 20px 56px;

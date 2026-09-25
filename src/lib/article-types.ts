@@ -15,6 +15,7 @@ export interface Article {
   topic: string;
   topicName: string;
   topicDescription: string;
+  topicCover: string | null;
   tags: string[];
   cover: ArticleCover;
   featured: boolean;

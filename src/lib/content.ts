@@ -176,7 +176,11 @@ export async function findArticle(slug: string): Promise<Article | undefined> {
 export async function readPublishedCover(cover: string) {
   await ensureFresh();
   const snapshot = state.snapshot;
-  if (!snapshot?.articles.some((article) => article.cover === cover))
+  if (
+    !snapshot?.articles.some(
+      (article) => article.cover === cover || article.topicCover === cover,
+    )
+  )
     return null;
   const file = await inspectCoverFile(snapshot.dir, cover);
   return {

@@ -32,7 +32,7 @@ export default async function TopicsPage() {
             return (
               <article className="topic-directory-row" key={topic.slug}>
                 <div className="topic-directory-main">
-                  <TopicArtwork slug={topic.slug} />
+                  <TopicArtwork slug={topic.slug} cover={topic.cover} />
                   <div>
                     <h2>
                       <Link href={`/topics/${topic.slug}`}>{topic.name}</Link>
