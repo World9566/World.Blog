@@ -254,95 +254,97 @@ export function AdminDashboard() {
   }
   return (
     <div className="container admin-content">
-      <div className="admin-overview" aria-label="管理概览">
-        {(
-          [
-            ["users", "用户", () => select("users")],
-            ["pending", "待审核评论", () => select("comments", "pending")],
-            ["hidden", "已隐藏评论", () => select("comments", "hidden")],
-          ] as const
-        ).map(([key, label, onClick]) => (
-          <button key={key} onClick={onClick}>
-            <span>{label}</span>
-            <strong>{overview ? overview[key] : "…"}</strong>
-            <span className="admin-stat-link">查看</span>
+      <nav
+        className="activity-tabs admin-tabs secondary-tabbar"
+        aria-label="管理中心导航"
+      >
+        {(Object.keys(sections) as Section[]).map((key) => (
+          <button
+            key={key}
+            className="secondary-tab"
+            aria-pressed={section === key}
+            onClick={() => select(key)}
+          >
+            <span>{sections[key]}</span>
+            <span className="admin-nav-meta">
+              {key === "comments"
+                ? overview
+                  ? `待审核 ${overview.pending} · 已隐藏 ${overview.hidden}`
+                  : "正在加载…"
+                : key === "users"
+                  ? overview
+                    ? `${overview.users} 位用户`
+                    : "正在加载…"
+                  : "查看管理操作"}
+            </span>
           </button>
         ))}
-      </div>
+      </nav>
       <section
         className="account-card admin-panel"
         aria-labelledby="admin-section-title"
       >
-        <nav className="activity-tabs admin-tabs" aria-label="管理中心导航">
-          {(Object.keys(sections) as Section[]).map((key) => (
-            <button
-              key={key}
-              aria-pressed={section === key}
-              onClick={() => select(key)}
-            >
-              {sections[key]}
+        <div className="admin-panel-header">
+          <div className="account-section-heading">
+            <h2 id="admin-section-title">{sections[section]}</h2>
+            <p>
+              {section === "comments"
+                ? "新评论发布后立即可见。审核讨论，让交流保持友善。"
+                : section === "users"
+                  ? "查看读者，管理账号状态与权限。"
+                  : "查看操作人、变更内容和原因。"}
+            </p>
+          </div>
+          <form
+            className="admin-filters"
+            role="search"
+            aria-label={`${sections[section]}搜索`}
+            onSubmit={(event) => {
+              event.preventDefault();
+              setQ(search.trim());
+              setPage(1);
+              setRevision((value) => value + 1);
+            }}
+          >
+            <div className="form-field">
+              <label htmlFor="admin-search">搜索</label>
+              <input
+                id="admin-search"
+                type="search"
+                maxLength={100}
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder={
+                  section === "users"
+                    ? "昵称、GitHub 用户名或 ID"
+                    : section === "comments"
+                      ? "评论、作者或文章"
+                      : "操作人、对象或原因"
+                }
+              />
+            </div>
+            <div className="form-field">
+              <label htmlFor="admin-filter">筛选</label>
+              <select
+                id="admin-filter"
+                value={status}
+                onChange={(event) => {
+                  setStatus(event.target.value);
+                  setPage(1);
+                }}
+              >
+                {Object.entries(filters[section]).map(([key, label]) => (
+                  <option key={key} value={key}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button className="button button-primary" type="submit">
+              搜索
             </button>
-          ))}
-        </nav>
-        <div className="account-section-heading">
-          <h2 id="admin-section-title">{sections[section]}</h2>
-          <p>
-            {section === "comments"
-              ? "新评论发布后立即可见。审核讨论，让交流保持友善。"
-              : section === "users"
-                ? "查看读者，管理账号状态与权限。"
-                : "查看操作人、变更内容和原因。"}
-          </p>
+          </form>
         </div>
-        <form
-          className="admin-filters"
-          role="search"
-          aria-label={`${sections[section]}搜索`}
-          onSubmit={(event) => {
-            event.preventDefault();
-            setQ(search.trim());
-            setPage(1);
-            setRevision((value) => value + 1);
-          }}
-        >
-          <div className="form-field">
-            <label htmlFor="admin-search">搜索</label>
-            <input
-              id="admin-search"
-              type="search"
-              maxLength={100}
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder={
-                section === "users"
-                  ? "昵称、GitHub 用户名或 ID"
-                  : section === "comments"
-                    ? "评论、作者或文章"
-                    : "操作人、对象或原因"
-              }
-            />
-          </div>
-          <div className="form-field">
-            <label htmlFor="admin-filter">筛选</label>
-            <select
-              id="admin-filter"
-              value={status}
-              onChange={(event) => {
-                setStatus(event.target.value);
-                setPage(1);
-              }}
-            >
-              {Object.entries(filters[section]).map(([key, label]) => (
-                <option key={key} value={key}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <button className="button button-primary" type="submit">
-            搜索
-          </button>
-        </form>
         {notice && (
           <p role="status" className="form-success">
             {notice}

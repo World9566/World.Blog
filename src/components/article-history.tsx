@@ -39,6 +39,7 @@ export function ArticleHistory({
           <li key={entry.revision}>
             <div className="history-meta">
               <time dateTime={entry.committedAt}>
+                <Icon name="calendar" width="14" height="14" />
                 {dateFormat.format(new Date(entry.committedAt))}
               </time>
               {index === 0 && <span className="history-latest">最新记录</span>}

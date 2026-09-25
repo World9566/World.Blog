@@ -7,6 +7,7 @@ import {
   useState,
   type FormEvent,
 } from "react";
+import { createPortal } from "react-dom";
 import { authClient } from "@/lib/auth-client";
 import {
   COMMENT_LIMIT,
@@ -21,6 +22,7 @@ import {
   jsonMutation,
 } from "@/lib/community-client";
 import { Icon } from "./icon";
+import { CopyButton } from "./copy-button";
 import { UserAvatar } from "./user-avatar";
 
 type CommunityData = { state: InteractionState; comments: CommentPage };
@@ -353,6 +355,20 @@ export function ArticleCommunity({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [version, setVersion] = useState(0);
+  const [actionTarget, setActionTarget] = useState<HTMLElement | null>(null);
+  const [articleInView, setArticleInView] = useState(true);
+  useEffect(() => {
+    setActionTarget(document.getElementById("article-actions-slot"));
+  }, []);
+  useEffect(() => {
+    const layout = actionTarget?.closest(".article-layout");
+    if (!layout) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      setArticleInView(entry.isIntersecting);
+    });
+    observer.observe(layout);
+    return () => observer.disconnect();
+  }, [actionTarget]);
   const reload = useCallback(
     async (signal?: AbortSignal) => {
       setError("");
@@ -450,109 +466,155 @@ export function ArticleCommunity({
     void reload();
   };
   return (
-    <section
-      className="community-section container"
-      id="comments"
-      aria-labelledby="comments-heading"
-    >
-      <div className="article-reactions" aria-label="文章互动">
-        <button
-          className="reaction-button"
-          aria-pressed={data?.state.liked || false}
-          disabled={!data || busy}
-          onClick={() => react("like")}
-        >
-          <Icon name="heart" />
-          <span>{data?.state.liked ? "已点赞" : "点赞"}</span>
-          {data && <span className="reaction-count">{data.state.likes}</span>}
-        </button>
-        <button
-          className="reaction-button"
-          aria-pressed={data?.state.bookmarked || false}
-          disabled={!data || busy}
-          onClick={() => react("bookmark")}
-        >
-          <Icon name="bookmark" />
-          <span>{data?.state.bookmarked ? "已收藏" : "收藏文章"}</span>
-        </button>
-      </div>
-      <div className="discussion-heading">
-        <div>
-          <p className="eyebrow">一起聊聊</p>
-          <h2 id="comments-heading">
-            评论{data ? <span>{data.state.comments}</span> : null}
-          </h2>
-        </div>
-        <p>好问题，让理解更进一步。</p>
-      </div>
-      {loading ? (
-        <p className="community-muted" role="status">
-          正在加载讨论…
-        </p>
-      ) : viewer ? (
-        <CommentComposer api={api} onPosted={() => changed("评论已发布。")} />
-      ) : (
-        <div className="comment-login">
-          <p>登录后，分享你的想法。</p>
-          <Link className="button button-primary" href={loginHref}>
-            <Icon name="github" />
-            使用 GitHub 继续
-          </Link>
-        </div>
-      )}
-      {notice && (
-        <p className="form-success community-notice" role="status">
-          {notice}
-        </p>
-      )}
-      {error && (
-        <div className="community-notice">
-          <p role="alert" className="form-error">
-            {error}
-          </p>
-          <button className="plain-action" onClick={() => void reload()}>
-            重新加载
-          </button>
-          {!viewer && (
-            <Link href={loginHref} className="plain-action">
-              去登录
-            </Link>
-          )}
-        </div>
-      )}
-      {data && (
-        <>
-          {data.comments.items.length ? (
-            <ol className="comment-list">
-              {data.comments.items.map((comment) => (
-                <CommentThread
-                  key={`${viewer || "guest"}-${comment.id}`}
-                  comment={comment}
-                  api={api}
-                  signedIn={!!viewer}
-                  loginHref={loginHref}
-                  version={version}
-                  onChanged={changed}
-                />
-              ))}
-            </ol>
-          ) : (
-            <div className="discussion-empty">
-              <Icon name="comment" width="28" height="28" />
-              <p>还没有评论，期待你的第一条见解。</p>
-            </div>
-          )}
-          {data.comments.nextCursor && (
+    <>
+      {actionTarget &&
+        createPortal(
+          <div
+            className={`article-action-rail${articleInView ? "" : " is-outside-article"}`}
+            role="group"
+            aria-label="文章操作"
+          >
             <button
-              className="button button-secondary comment-more"
-              disabled={busy}
-              onClick={more}
+              type="button"
+              className="article-action-button"
+              aria-label={data?.state.liked ? "取消点赞" : "点赞文章"}
+              aria-pressed={data?.state.liked || false}
+              title={data?.state.liked ? "取消点赞" : "点赞文章"}
+              disabled={!data || busy}
+              onClick={() => void react("like")}
             >
-              {busy ? "正在加载…" : "更多评论"}
+              <Icon name="heart" />
+              <span className="article-action-count">
+                {data?.state.likes ?? 0}
+              </span>
             </button>
-          )}
-        </>
-      )}
-    </section>
+            <a
+              className="article-action-button"
+              href="#comments"
+              aria-label={`查看评论${data ? `，${data.state.comments} 条` : ""}`}
+              title="查看评论"
+            >
+              <Icon name="comment" />
+              <span className="article-action-count">
+                {data?.state.comments ?? 0}
+              </span>
+            </a>
+            <CopyButton share compact />
+            <button
+              type="button"
+              className="article-action-button article-action-top"
+              aria-label="返回顶部"
+              title="返回顶部"
+              onClick={() =>
+                window.scrollTo({
+                  top: 0,
+                  behavior: window.matchMedia(
+                    "(prefers-reduced-motion: reduce)",
+                  ).matches
+                    ? "auto"
+                    : "smooth",
+                })
+              }
+            >
+              <Icon name="arrow" />
+            </button>
+          </div>,
+          actionTarget,
+        )}
+      <section
+        className="community-section container"
+        id="comments"
+        aria-labelledby="comments-heading"
+      >
+        <div className="article-reactions" aria-label="文章互动">
+          <button
+            className="reaction-button"
+            aria-pressed={data?.state.bookmarked || false}
+            disabled={!data || busy}
+            onClick={() => react("bookmark")}
+          >
+            <Icon name="bookmark" />
+            <span>{data?.state.bookmarked ? "已收藏" : "收藏文章"}</span>
+          </button>
+        </div>
+        <div className="discussion-heading">
+          <div>
+            <p className="eyebrow">一起聊聊</p>
+            <h2 id="comments-heading">
+              评论{data ? <span>{data.state.comments}</span> : null}
+            </h2>
+          </div>
+          <p>好问题，让理解更进一步。</p>
+        </div>
+        {loading ? (
+          <p className="community-muted" role="status">
+            正在加载讨论…
+          </p>
+        ) : viewer ? (
+          <CommentComposer api={api} onPosted={() => changed("评论已发布。")} />
+        ) : (
+          <div className="comment-login">
+            <p>登录后，分享你的想法。</p>
+            <Link className="button button-primary" href={loginHref}>
+              <Icon name="github" />
+              使用 GitHub 继续
+            </Link>
+          </div>
+        )}
+        {notice && (
+          <p className="form-success community-notice" role="status">
+            {notice}
+          </p>
+        )}
+        {error && (
+          <div className="community-notice">
+            <p role="alert" className="form-error">
+              {error}
+            </p>
+            <button className="plain-action" onClick={() => void reload()}>
+              重新加载
+            </button>
+            {!viewer && (
+              <Link href={loginHref} className="plain-action">
+                去登录
+              </Link>
+            )}
+          </div>
+        )}
+        {data && (
+          <>
+            {data.comments.items.length ? (
+              <ol className="comment-list">
+                {data.comments.items.map((comment) => (
+                  <CommentThread
+                    key={`${viewer || "guest"}-${comment.id}`}
+                    comment={comment}
+                    api={api}
+                    signedIn={!!viewer}
+                    loginHref={loginHref}
+                    version={version}
+                    onChanged={changed}
+                  />
+                ))}
+              </ol>
+            ) : (
+              <div className="discussion-empty">
+                <Icon name="comment" width="28" height="28" />
+                <p>还没有评论，期待你的第一条见解。</p>
+              </div>
+            )}
+            {data.comments.nextCursor && (
+              <button
+                className="button button-secondary comment-more"
+                disabled={busy}
+                onClick={more}
+              >
+                {busy ? "正在加载…" : "更多评论"}
+              </button>
+            )}
+          </>
+        )}
+      </section>
+    </>
   );
 }

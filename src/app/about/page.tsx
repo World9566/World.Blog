@@ -11,33 +11,35 @@ export const metadata: Metadata = {
 };
 export default function AboutPage() {
   return (
-    <main id="main-content">
+    <main id="main-content" className="about-page">
       <section className="page-heading container about-heading">
-        <HeroArtwork />
+        <HeroArtwork layers={false} />
+        <div className="about-heading-copy">
+          <p className="eyebrow">你好，我是 {site.author}</p>
+          <h1>
+            记录所学。
+            <br />
+            保持好奇。
+          </h1>
+          <p>
+            这里是我的技术笔记。
+            <br />
+            从具体的问题出发，留下代码、方法和思考。
+          </p>
+          <a
+            href={site.github}
+            className="button button-primary"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            在 GitHub 找到我 <Icon name="external" width="17" height="17" />
+          </a>
+        </div>
         <span className="about-monogram" aria-hidden="true">
           w.
         </span>
-        <p className="eyebrow">你好，我是 {site.author}</p>
-        <h1>
-          记录所学。
-          <br />
-          保持好奇。
-        </h1>
-        <p>
-          这里是我的技术笔记。
-          <br />
-          从具体的问题出发，留下代码、方法和思考。
-        </p>
-        <a
-          href={site.github}
-          className="button button-primary"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          在 GitHub 找到我 <Icon name="external" width="17" height="17" />
-        </a>
       </section>
-      <section className="section section-parchment">
+      <section className="section section-parchment about-section">
         <div className="container about-reading">
           <h2>把理解，留在文字里。</h2>
           <p>

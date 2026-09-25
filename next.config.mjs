@@ -9,7 +9,7 @@ const withMDX = createMDX({
     remarkPlugins: [remarkGfm, remarkFrontmatter],
     rehypePlugins: [
       rehypeSlug,
-      [rehypePrettyCode, { theme: "github-light", keepBackground: false }],
+      [rehypePrettyCode, { theme: "github-dark", keepBackground: false }],
     ],
   },
 });

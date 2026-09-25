@@ -46,19 +46,36 @@ export default async function Home() {
             className={`container featured-grid${featured.cover ? "" : " featured-text-only"}`}
           >
             <div className="featured-copy">
-              <p className="eyebrow">精选 · {featured.topicName}</p>
+              <p className="eyebrow">
+                精选 ·{" "}
+                <Link href={`/topics/${featured.topic}`}>
+                  {featured.topicName}
+                </Link>
+              </p>
               <h2>
                 <Link href={`/articles/${featured.slug}`}>
                   {featured.title}
                 </Link>
               </h2>
               <p>{featured.description}</p>
-              <Link href={`/articles/${featured.slug}`} className="text-link">
-                阅读文章 <Icon name="arrow" />
-              </Link>
-              <span className="featured-time">
-                {featured.readingMinutes} 分钟阅读
-              </span>
+              <div className="featured-meta">
+                <time dateTime={featured.publishedAt}>
+                  <Icon name="calendar" width="17" height="17" />
+                  {formatDate(featured.publishedAt)}
+                </time>
+                <span className="featured-meta-divider" aria-hidden="true" />
+                <span className="featured-meta-duration">
+                  <Icon name="clock" width="17" height="17" />
+                  {featured.readingMinutes} 分钟阅读
+                </span>
+                <span className="featured-meta-divider" aria-hidden="true" />
+                <Link
+                  href={`/articles/${featured.slug}`}
+                  className="featured-meta-link"
+                >
+                  阅读文章 <Icon name="arrow" width="17" height="17" />
+                </Link>
+              </div>
             </div>
             {featured.cover && (
               <Link
@@ -106,6 +123,7 @@ export default async function Home() {
                       <div className="home-bento-compact-copy">
                         <h3>{article.title}</h3>
                         <time dateTime={article.publishedAt}>
+                          <Icon name="calendar" width="15" height="15" />
                           {formatDate(article.publishedAt)}
                         </time>
                       </div>

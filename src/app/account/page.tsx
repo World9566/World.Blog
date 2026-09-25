@@ -9,6 +9,7 @@ import { UserAvatar } from "@/components/user-avatar";
 import { SignOut } from "@/components/sign-out";
 import { Icon } from "@/components/icon";
 import { AccountActivity } from "@/components/account-activity";
+import { AccountNavigation } from "@/components/account-navigation";
 
 export const metadata: Metadata = {
   title: "个人中心",
@@ -71,18 +72,8 @@ export default async function AccountPage() {
         </div>
       </header>
       <div className="account-layout container">
-        <aside>
-          <nav className="account-navigation" aria-label="个人中心导航">
-            <a href="#reading">
-              我的阅读 <Icon name="chevron" width="16" height="16" />
-            </a>
-            <a href="#profile">
-              基本资料 <Icon name="chevron" width="16" height="16" />
-            </a>
-            <a href="#security">
-              登录与安全 <Icon name="chevron" width="16" height="16" />
-            </a>
-          </nav>
+        <aside className="account-navigation-column">
+          <AccountNavigation />
         </aside>
         <div className="account-content">
           <AccountActivity />

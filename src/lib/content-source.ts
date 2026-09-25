@@ -95,6 +95,15 @@ export function parseArticle(source: string, filename: string): SourceArticle {
   if (updatedAt < publishedAt)
     throw new Error("updatedAt must not precede publishedAt");
   const tree = parser.parse(content) as Root;
+  const description = field(data, "description", 240);
+  let preview: string | undefined;
+  for (const node of tree.children) {
+    if (node.type === "heading" || node.type === "code") break;
+    if (node.type !== "paragraph") continue;
+    const opening = plainText(node).replace(/\s+/g, " ").trim();
+    if (opening && opening !== description) preview = opening;
+    break;
+  }
   const slugger = new GithubSlugger();
   const headings: Heading[] = [];
   function walk(node: Root | RootContent) {
@@ -120,7 +129,8 @@ export function parseArticle(source: string, filename: string): SourceArticle {
     slug,
     filename,
     title: field(data, "title", 120),
-    description: field(data, "description", 240),
+    description,
+    preview,
     publishedAt,
     updatedAt,
     topic,

@@ -4,9 +4,17 @@ import { formatDate } from "@/lib/site";
 import { ArticleArt } from "./article-art";
 import { Icon } from "./icon";
 
-export function ArticleCard({ article }: { article: Article }) {
+export function ArticleCard({
+  article,
+  archive = false,
+}: {
+  article: Article;
+  archive?: boolean;
+}) {
   return (
-    <article className="article-card">
+    <article
+      className={`article-card${article.cover ? "" : " article-card-text-only"}`}
+    >
       {article.cover && (
         <Link
           className="card-art-link"
@@ -21,15 +29,32 @@ export function ArticleCard({ article }: { article: Article }) {
         <Link className="category-link" href={`/topics/${article.topic}`}>
           {article.topicName}
         </Link>
+        {archive && article.tags.length > 0 && (
+          <div className="card-tags" aria-label="文章标签">
+            {article.tags.map((tag) => (
+              <Link href={`/articles?tag=${encodeURIComponent(tag)}`} key={tag}>
+                {tag}
+              </Link>
+            ))}
+          </div>
+        )}
         <h3>
           <Link href={`/articles/${article.slug}`}>{article.title}</Link>
         </h3>
-        <p>{article.description}</p>
+        <p>
+          {article.description}
+          {archive && article.preview ? ` ${article.preview}` : ""}
+        </p>
         <div className="card-meta">
           <time dateTime={article.publishedAt}>
+            <Icon name="calendar" width="15" height="15" />
             {formatDate(article.publishedAt)}
           </time>
-          <span>{article.readingMinutes} 分钟阅读</span>
+          <span className="card-meta-divider" aria-hidden="true" />
+          <span className="card-meta-duration">
+            <Icon name="clock" width="15" height="15" />
+            {article.readingMinutes} 分钟阅读
+          </span>
         </div>
         <Link
           className="card-read"

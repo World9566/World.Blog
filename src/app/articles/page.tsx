@@ -45,10 +45,13 @@ export default async function ArticlesPage({
       </section>
       <section className="section-parchment archive-content">
         <div className="container">
-          <nav className="filter-row" aria-label="文章专题筛选">
+          <nav
+            className="filter-row secondary-tabbar"
+            aria-label="文章专题筛选"
+          >
             <Link
               href="/articles"
-              className={`filter-chip${!topic && !tag ? " selected" : ""}`}
+              className={`filter-chip secondary-tab${!topic && !tag ? " selected" : ""}`}
               aria-current={!topic && !tag ? "page" : undefined}
             >
               全部 <span>{articles.length}</span>
@@ -57,7 +60,7 @@ export default async function ArticlesPage({
               <Link
                 href={`/articles?topic=${item.slug}`}
                 key={item.slug}
-                className={`filter-chip${topic === item.slug ? " selected" : ""}`}
+                className={`filter-chip secondary-tab${topic === item.slug ? " selected" : ""}`}
                 aria-current={topic === item.slug ? "page" : undefined}
               >
                 {item.name}
@@ -71,11 +74,11 @@ export default async function ArticlesPage({
             </div>
           )}
           {filtered.length ? (
-            <div className="article-grid">
+            <div className="archive-list">
               {filtered
                 .slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
                 .map((article) => (
-                  <ArticleCard article={article} key={article.id} />
+                  <ArticleCard article={article} archive key={article.id} />
                 ))}
             </div>
           ) : (

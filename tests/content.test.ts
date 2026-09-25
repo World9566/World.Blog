@@ -158,6 +158,23 @@ const cache = new Map();
   assert.equal(result.readingMinutes, 1);
 });
 
+test("article previews use opening prose without pulling text from later sections", () => {
+  const withOpening = parseArticle(
+    article(
+      {},
+      "正文开头补充了更多背景。\n\n## 原理\n\n后面的章节不属于摘要。",
+    ),
+    "example.mdx",
+  );
+  assert.equal(withOpening.preview, "正文开头补充了更多背景。");
+
+  const codeLed = parseArticle(
+    article({}, "## 原理\n\n```ts\nconst value = 1;\n```\n\n后面的文字。"),
+    "example.mdx",
+  );
+  assert.equal(codeLed.preview, undefined);
+});
+
 test("unsafe filenames are rejected with an actionable error", async () => {
   await withDirectory({ "Bad Name.mdx": article() }, async (directory) => {
     await assert.rejects(

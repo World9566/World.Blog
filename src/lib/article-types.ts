@@ -9,6 +9,7 @@ export interface Article {
   slug: string;
   title: string;
   description: string;
+  preview?: string;
   publishedAt: string;
   updatedAt: string;
   topic: string;

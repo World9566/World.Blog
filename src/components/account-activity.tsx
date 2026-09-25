@@ -91,8 +91,12 @@ export function AccountActivity() {
         <h2>我的阅读</h2>
         <p>保存值得回看的文章，继续参与过的讨论。</p>
       </div>
-      <div className="activity-tabs" aria-label="阅读记录类型">
+      <nav
+        className="activity-tabs nested-tabbar secondary-tabbar"
+        aria-label="阅读记录类型"
+      >
         <button
+          className="secondary-tab"
           aria-pressed={kind === "bookmarks"}
           disabled={busy}
           onClick={() => setKind("bookmarks")}
@@ -101,6 +105,7 @@ export function AccountActivity() {
           我的收藏
         </button>
         <button
+          className="secondary-tab"
           aria-pressed={kind === "comments"}
           disabled={busy}
           onClick={() => setKind("comments")}
@@ -108,7 +113,7 @@ export function AccountActivity() {
           <Icon name="comment" />
           我的评论
         </button>
-      </div>
+      </nav>
       {loading && (
         <p className="activity-empty" role="status">
           正在加载…

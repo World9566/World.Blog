@@ -11,7 +11,6 @@ import { mdxComponentMap } from "@/mdx-components";
 import { formatDate, getSiteUrl, site } from "@/lib/site";
 import { isPresetCover } from "@/lib/article-cover";
 import { ArticleArt } from "@/components/article-art";
-import { CopyButton } from "@/components/copy-button";
 import { TableOfContents } from "@/components/table-of-contents";
 import { ReadingProgress } from "@/components/reading-progress";
 import { ArticleCard } from "@/components/article-card";
@@ -77,20 +76,23 @@ export default async function ArticlePage({
   return (
     <main id="main-content">
       <ReadingProgress />
-      <div className="article-subnav">
-        <div className="container">
-          <Link href="/articles">
-            <Icon
-              name="chevron"
-              className="back-chevron"
-              width="14"
-              height="14"
-            />{" "}
-            全部文章
-          </Link>
-          <Link href={`/topics/${article.topic}`}>{article.topicName}</Link>
-        </div>
-      </div>
+      <nav
+        className="article-subnav secondary-tabbar container"
+        aria-label="文章导航"
+      >
+        <Link href="/articles" className="secondary-tab">
+          <Icon
+            name="chevron"
+            className="back-chevron"
+            width="14"
+            height="14"
+          />{" "}
+          全部文章
+        </Link>
+        <Link href={`/topics/${article.topic}`} className="secondary-tab">
+          {article.topicName}
+        </Link>
+      </nav>
       <header className="article-heading">
         <Link href={`/topics/${article.topic}`} className="category-link">
           {article.topicName}
@@ -108,10 +110,15 @@ export default async function ArticlePage({
             {site.author}
           </a>
           <span className="byline-divider" />
-          <time dateTime={article.publishedAt}>
+          <time className="byline-meta" dateTime={article.publishedAt}>
+            <Icon name="calendar" width="15" height="15" />
             {formatDate(article.publishedAt)}
           </time>
-          <span>{article.readingMinutes} 分钟阅读</span>
+          <span className="byline-divider" aria-hidden="true" />
+          <span className="byline-meta">
+            <Icon name="clock" width="15" height="15" />
+            {article.readingMinutes} 分钟阅读
+          </span>
         </div>
       </header>
       {article.cover && !isPresetCover(article.cover) && (
@@ -136,15 +143,16 @@ export default async function ArticlePage({
                 </Link>
               ))}
             </div>
-            <CopyButton share />
             {article.updatedAt !== article.publishedAt && (
               <p className="updated-at">
+                <Icon name="calendar" width="15" height="15" />
                 更新于 {formatDate(article.updatedAt)}
               </p>
             )}
           </div>
           <ArticleHistory {...history} />
         </article>
+        <div id="article-actions-slot" className="article-action-column" />
       </div>
       <ArticleCommunity articleId={article.id} slug={article.slug} />
       {related.length > 0 && (

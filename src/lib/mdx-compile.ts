@@ -15,13 +15,14 @@ import type { PluggableList } from "unified";
 // resolution of import-only exports such as estree-walker. Webpack handles
 // the same dynamic imports as ordinary code-split chunks.
 interface MdxPipeline {
-  compile: typeof import("@mdx-js/mdx")["compile"];
-  run: typeof import("@mdx-js/mdx")["run"];
+  compile: (typeof import("@mdx-js/mdx"))["compile"];
+  run: (typeof import("@mdx-js/mdx"))["run"];
   remarkPlugins: PluggableList;
   rehypePlugins: PluggableList;
 }
 
 let pipeline: Promise<MdxPipeline> | null = null;
+const highlightTheme = "github-dark";
 
 function loadPipeline(): Promise<MdxPipeline> {
   return (pipeline ??= (async () => {
@@ -40,7 +41,7 @@ function loadPipeline(): Promise<MdxPipeline> {
         rehypeSlug.default,
         [
           rehypePrettyCode.default,
-          { theme: "github-light", keepBackground: false },
+          { theme: highlightTheme, keepBackground: false },
         ],
       ],
     };
@@ -53,8 +54,8 @@ export type ArticleComponent = ComponentType<{
 
 // Compiling (syntax highlighting included) is the expensive part; running the
 // compiled function body is cheap. Cache entries are keyed by the article
-// source hash plus the application revision, so image changes and article
-// edits never collide. Writes are atomic and best effort: a read-only or
+// source hash, highlight theme and application revision, so theme changes and
+// article edits never collide. Writes are atomic and best effort: a read-only or
 // missing cache only costs compile time.
 function cacheDirectory(): string | null {
   const configured = process.env.CONTENT_COMPILE_CACHE;
@@ -92,7 +93,7 @@ async function cachedCode(
   const entry = path.join(
     directory,
     revision,
-    `${createHash("sha256").update(content).digest("hex")}.js`,
+    `${createHash("sha256").update(highlightTheme).update(content).digest("hex")}.js`,
   );
   try {
     return { code: await readFile(entry, "utf8"), entry };

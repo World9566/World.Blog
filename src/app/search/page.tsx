@@ -51,28 +51,31 @@ export default async function SearchPage({
           </div>
         )}
       </section>
-      <section className="search-content container">
-        {query && (
-          <nav className="filter-row" aria-label="搜索专题筛选">
+      {query && (
+        <nav
+          className="filter-row secondary-tabbar container"
+          aria-label="搜索专题筛选"
+        >
+          <Link
+            className={`filter-chip secondary-tab${!topic ? " selected" : ""}`}
+            href={`/search?${new URLSearchParams({ q: query })}`}
+            aria-current={!topic ? "page" : undefined}
+          >
+            全部专题
+          </Link>
+          {topics.map((item) => (
             <Link
-              className={`filter-chip${!topic ? " selected" : ""}`}
-              href={`/search?${new URLSearchParams({ q: query })}`}
-              aria-current={!topic ? "page" : undefined}
+              key={item.slug}
+              className={`filter-chip secondary-tab${topic === item.slug ? " selected" : ""}`}
+              href={`/search?${new URLSearchParams({ q: query, topic: item.slug })}`}
+              aria-current={topic === item.slug ? "page" : undefined}
             >
-              全部专题
+              {item.name}
             </Link>
-            {topics.map((item) => (
-              <Link
-                key={item.slug}
-                className={`filter-chip${topic === item.slug ? " selected" : ""}`}
-                href={`/search?${new URLSearchParams({ q: query, topic: item.slug })}`}
-                aria-current={topic === item.slug ? "page" : undefined}
-              >
-                {item.name}
-              </Link>
-            ))}
-          </nav>
-        )}
+          ))}
+        </nav>
+      )}
+      <section className="search-content container">
         {tooLong ? (
           <div className="empty-state" role="status">
             <h2>关键词有点长。</h2>
@@ -104,9 +107,17 @@ export default async function SearchPage({
                       <p>{excerpt(article, query)}</p>
                       <div className="card-meta">
                         <time dateTime={article.publishedAt}>
+                          <Icon name="calendar" width="15" height="15" />
                           {formatDate(article.publishedAt)}
                         </time>
-                        <span>{article.readingMinutes} 分钟阅读</span>
+                        <span
+                          className="card-meta-divider"
+                          aria-hidden="true"
+                        />
+                        <span className="card-meta-duration">
+                          <Icon name="clock" width="15" height="15" />
+                          {article.readingMinutes} 分钟阅读
+                        </span>
                       </div>
                     </article>
                   ))}
