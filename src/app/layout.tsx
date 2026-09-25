@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
+import { NavigationFeedback } from "@/components/navigation-feedback";
 import { getSiteUrl, site } from "@/lib/site";
 import "./globals.css";
 
@@ -38,6 +40,9 @@ export default function RootLayout({
       </head>
       <body>
         <SiteHeader />
+        <Suspense fallback={null}>
+          <NavigationFeedback />
+        </Suspense>
         {children}
         <SiteFooter />
       </body>

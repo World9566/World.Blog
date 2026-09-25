@@ -4,11 +4,26 @@ import { formatDate } from "@/lib/site";
 import { ArticleArt } from "./article-art";
 import { Icon } from "./icon";
 
+export type ArticleCardData = Pick<
+  Article,
+  | "id"
+  | "slug"
+  | "cover"
+  | "topic"
+  | "topicName"
+  | "tags"
+  | "title"
+  | "description"
+  | "preview"
+  | "publishedAt"
+  | "readingMinutes"
+>;
+
 export function ArticleCard({
   article,
   archive = false,
 }: {
-  article: Article;
+  article: ArticleCardData;
   archive?: boolean;
 }) {
   return (
