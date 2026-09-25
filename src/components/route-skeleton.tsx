@@ -1,7 +1,7 @@
 export function RouteSkeleton({
   variant = "archive",
 }: {
-  variant?: "home" | "archive" | "article" | "topic";
+  variant?: "archive" | "article" | "topic";
 }) {
   return (
     <main
@@ -16,7 +16,7 @@ export function RouteSkeleton({
           <div className="skeleton-line skeleton-title" />
           <div className="skeleton-line skeleton-subtitle" />
         </div>
-        {variant !== "home" && <div className="skeleton-line skeleton-tabs" />}
+        <div className="skeleton-line skeleton-tabs" />
         <div className="route-skeleton-grid">
           <div className="route-skeleton-card">
             <div className="skeleton-image" />
