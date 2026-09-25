@@ -8,14 +8,9 @@ previous=""
 [[ ! -f "$STATE_DIR/current-release" ]] || previous=$(cat "$STATE_DIR/current-release")
 export BLOG_RELEASE=$target
 dc config --quiet
-if [[ "${BLOG_SKIP_PULL:-0}" != 1 ]]; then
-  source "$ROOT/scripts/ops/pull-images.sh"
-  pull_images
-fi
-for image in "$BLOG_IMAGE:$target" "$BLOG_IMAGE:$target-ops"; do
-  image_revision=$("${DOCKER[@]}" image inspect "$image" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')
-  [[ "$image_revision" == "$target" ]] || { echo "Image revision does not match requested release: $image" >&2; exit 1; }
-done
+if [[ "${BLOG_SKIP_PULL:-0}" != 1 ]]; then dc pull postgres meilisearch gateway web ops; fi
+image_revision=$("${DOCKER[@]}" image inspect "$BLOG_IMAGE:$target" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')
+[[ "$image_revision" == "$target" ]] || { echo 'Image revision does not match requested release.' >&2; exit 1; }
 dc run --rm --no-deps ops node scripts/ops/check-env.mjs
 dc up -d --wait --wait-timeout 120 postgres meilisearch
 before=$(schema_version)
