@@ -68,8 +68,19 @@ for (const article of articles) {
     const image = await fetch(new URL(article.cover, base));
     assert.equal(image.status, 200, article.cover);
     assert.ok(image.headers.get("content-type")?.startsWith("image/"));
-    assert.equal(image.headers.get("cache-control"), "no-store");
+    const cacheControl = "private, no-cache, must-revalidate";
+    assert.equal(image.headers.get("cache-control"), cacheControl);
+    const etag = image.headers.get("etag");
+    assert.match(etag || "", /^"[a-f0-9]{64}"$/, `${article.slug} cover ETag`);
     assert.ok((await image.arrayBuffer()).byteLength > 0);
+    const unchanged = await fetch(new URL(article.cover, base), {
+      headers: { "If-None-Match": etag },
+      signal: AbortSignal.timeout(30000),
+    });
+    assert.equal(unchanged.status, 304, `${article.slug} unchanged cover`);
+    assert.equal(unchanged.headers.get("etag"), etag);
+    assert.equal(unchanged.headers.get("cache-control"), cacheControl);
+    assert.equal((await unchanged.arrayBuffer()).byteLength, 0);
     assert.ok(html.includes(article.cover), `${article.slug} cover`);
   }
 }
@@ -77,7 +88,12 @@ assert.ok(
   !(await page("/topics")).includes("topic-number"),
   "topic directory has no numbering",
 );
-await page("/media/not-published.png", 404);
+const missingImage = await fetch(new URL("/media/not-published.png", base), {
+  headers: { "If-None-Match": "*" },
+  signal: AbortSignal.timeout(30000),
+});
+assert.equal(missingImage.status, 404, "unpublished cover cannot be reused");
+assert.equal(missingImage.headers.get("cache-control"), "no-store");
 await page("/articles/no-such-article-smoke-test", 404);
 await page("/topics/no-such-topic-smoke-test", 404);
 

@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Suspense } from "react";
 import { searchArticles, excerpt } from "@/lib/search";
 import { formatDate } from "@/lib/site";
 import { getArticles } from "@/lib/content";
@@ -8,7 +7,7 @@ import { topicsForArticles } from "@/lib/topics";
 import { SearchForm } from "@/components/search-form";
 import { Pagination, PAGE_SIZE, parsePage } from "@/components/pagination";
 import { Icon } from "@/components/icon";
-import { SearchResultsSkeleton } from "@/components/search-skeleton";
+import type { Article } from "@/lib/article-types";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -30,6 +29,8 @@ export default async function SearchPage({
     topics.some((item) => item.slug === params.topic)
       ? params.topic
       : "";
+  const result =
+    query && !tooLong ? await searchArticles(query, topic) : { articles: [] };
   return (
     <main id="main-content" className="search-page">
       <section className="page-heading container">
@@ -78,16 +79,12 @@ export default async function SearchPage({
             <p>请将搜索内容缩短到 120 个字符以内。</p>
           </div>
         ) : query ? (
-          <Suspense
-            key={JSON.stringify([query, topic, params.page])}
-            fallback={<SearchResultsSkeleton />}
-          >
-            <SearchResults
-              query={query}
-              topic={topic}
-              requestedPage={params.page}
-            />
-          </Suspense>
+          <SearchResults
+            articles={result.articles}
+            query={query}
+            topic={topic}
+            requestedPage={params.page}
+          />
         ) : (
           <div className="search-intro">
             <Icon name="book" width="28" height="28" />
@@ -99,28 +96,29 @@ export default async function SearchPage({
   );
 }
 
-async function SearchResults({
+function SearchResults({
+  articles,
   query,
   topic,
   requestedPage,
 }: {
+  articles: Article[];
   query: string;
   topic: string;
   requestedPage?: string;
 }) {
-  const result = await searchArticles(query, topic);
   const page = Math.min(
     parsePage(requestedPage),
-    Math.max(1, Math.ceil(result.articles.length / PAGE_SIZE)),
+    Math.max(1, Math.ceil(articles.length / PAGE_SIZE)),
   );
   return (
     <>
       <p className="result-count" role="status">
-        “{query}” 的搜索结果 · {result.articles.length} 篇文章
+        “{query}” 的搜索结果 · {articles.length} 篇文章
       </p>
-      {result.articles.length ? (
+      {articles.length ? (
         <div className="search-results">
-          {result.articles
+          {articles
             .slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
             .map((article) => (
               <article className="search-result" key={article.id}>
@@ -163,7 +161,7 @@ async function SearchResults({
       )}
       <Pagination
         page={page}
-        total={result.articles.length}
+        total={articles.length}
         pathname="/search"
         params={{ q: query, ...(topic ? { topic } : {}) }}
       />
