@@ -84,6 +84,12 @@
 html {
   scroll-behavior: smooth;
   scroll-padding-top: 124px;
+  scrollbar-gutter: stable;
+}
+@supports not (scrollbar-gutter: stable) {
+  html {
+    overflow-y: scroll;
+  }
 }
 body {
   margin: 0;
@@ -2431,6 +2437,65 @@ main[id="main-content"]:not(.route-skeleton) {
 .skeleton-line {
   width: 100%;
   height: 14px;
+}
+.search-results-skeleton {
+  min-width: 0;
+}
+.search-skeleton-count {
+  width: min(220px, 60%);
+  margin-block: 5px;
+}
+.search-skeleton-card {
+  display: grid;
+  gap: 22px;
+  min-height: 246px;
+}
+.search-skeleton-card:hover {
+  transform: none;
+  box-shadow: var(--card-shadow);
+}
+.search-skeleton-category {
+  width: 72px;
+  height: 12px;
+}
+.search-skeleton-title {
+  width: 70%;
+  height: 26px;
+}
+.search-skeleton-copy {
+  display: grid;
+  gap: 12px;
+}
+.search-skeleton-copy .short {
+  width: 60%;
+}
+.search-skeleton-meta {
+  width: min(240px, 65%);
+  height: 12px;
+}
+.search-skeleton-form {
+  justify-content: space-between;
+  min-height: 64px;
+}
+.search-skeleton-input {
+  width: 42%;
+}
+.search-skeleton-button {
+  width: 72px;
+  height: 44px;
+  border-radius: var(--radius-pill);
+}
+.search-skeleton-filters {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  height: 54px;
+  margin-bottom: 24px;
+  padding-inline: 24px;
+  overflow: hidden;
+}
+.search-skeleton-filters > .skeleton-line {
+  flex: 0 0 64px;
 }
 .skeleton-kicker {
   width: 82px;

@@ -17,6 +17,7 @@ import {
   jsonMutation,
 } from "@/lib/community-client";
 import { UserAvatar } from "./user-avatar";
+import { AdminListSkeleton } from "./admin-list-skeleton";
 
 type Section = "comments" | "users" | "audit";
 type Row = AdminComment | AdminUser | AuditView;
@@ -194,6 +195,15 @@ export function AdminDashboard() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [target, setTarget] = useState<Target | null>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
+  const [loadingHeight, setLoadingHeight] = useState(0);
+
+  function beginLoading() {
+    setLoadingHeight(resultsRef.current?.getBoundingClientRect().height || 0);
+    setLoading(true);
+    setData(null);
+    setError("");
+  }
   useEffect(() => {
     const controller = new AbortController();
     setData(null);
@@ -230,6 +240,8 @@ export function AdminDashboard() {
     return () => controller.abort();
   }, [section, status, q, page, revision]);
   function select(next: Section, filter = "all") {
+    if (next === section && filter === status && !q && page === 1) return;
+    beginLoading();
     setSection(next);
     setStatus(filter);
     setPage(1);
@@ -267,15 +279,27 @@ export function AdminDashboard() {
           >
             <span>{sections[key]}</span>
             <span className="admin-nav-meta">
-              {key === "comments"
-                ? overview
-                  ? `待审核 ${overview.pending} · 已隐藏 ${overview.hidden}`
-                  : "正在加载…"
-                : key === "users"
-                  ? overview
-                    ? `${overview.users} 位用户`
-                    : "正在加载…"
-                  : "查看管理操作"}
+              {key === "comments" ? (
+                overview ? (
+                  `待审核 ${overview.pending} · 已隐藏 ${overview.hidden}`
+                ) : (
+                  <span
+                    className="skeleton-line admin-nav-skeleton"
+                    aria-label="正在加载统计"
+                  />
+                )
+              ) : key === "users" ? (
+                overview ? (
+                  `${overview.users} 位用户`
+                ) : (
+                  <span
+                    className="skeleton-line admin-nav-skeleton"
+                    aria-label="正在加载统计"
+                  />
+                )
+              ) : (
+                "查看管理操作"
+              )}
             </span>
           </button>
         ))}
@@ -301,6 +325,7 @@ export function AdminDashboard() {
             aria-label={`${sections[section]}搜索`}
             onSubmit={(event) => {
               event.preventDefault();
+              beginLoading();
               setQ(search.trim());
               setPage(1);
               setRevision((value) => value + 1);
@@ -329,6 +354,7 @@ export function AdminDashboard() {
                 id="admin-filter"
                 value={status}
                 onChange={(event) => {
+                  beginLoading();
                   setStatus(event.target.value);
                   setPage(1);
                 }}
@@ -350,219 +376,238 @@ export function AdminDashboard() {
             {notice}
           </p>
         )}
-        {loading && (
-          <p role="status" className="activity-empty">
-            正在加载…
-          </p>
-        )}
-        {error && (
-          <div className="community-notice">
-            <p role="alert" className="form-error">
-              {error}
-            </p>
-            <button
-              className="plain-action"
-              onClick={() => setRevision((value) => value + 1)}
-            >
-              重试
-            </button>
-            <Link href="/login?next=%2Fadmin" className="plain-action">
-              重新登录
-            </Link>
-          </div>
-        )}
-        {data && !data.items.length && (
-          <div className="activity-empty">
-            <p>
-              {q
-                ? "没有找到匹配的记录。"
-                : section === "comments" && status === "pending"
-                  ? "所有评论都已查看，暂时没有待审核的讨论。"
-                  : "这里暂时没有记录。"}
-            </p>
-          </div>
-        )}
-        {data && !!data.items.length && (
-          <ul className="admin-list">
-            {data.items.map((row) => (
-              <li key={row.id}>
-                {"githubId" in row ? (
-                  <>
-                    <div className="admin-row-top">
-                      <div className="admin-person">
-                        <UserAvatar name={row.name} image={row.image} />
-                        <h3>{row.name}</h3>
+        <div
+          ref={resultsRef}
+          className="admin-results"
+          aria-busy={loading}
+          style={
+            loading && loadingHeight ? { minHeight: loadingHeight } : undefined
+          }
+        >
+          {loading && <AdminListSkeleton section={section} />}
+          {error && (
+            <div className="community-notice">
+              <p role="alert" className="form-error">
+                {error}
+              </p>
+              <button
+                className="plain-action"
+                onClick={() => {
+                  beginLoading();
+                  setRevision((value) => value + 1);
+                }}
+              >
+                重试
+              </button>
+              <Link href="/login?next=%2Fadmin" className="plain-action">
+                重新登录
+              </Link>
+            </div>
+          )}
+          {data && !data.items.length && (
+            <div className="activity-empty">
+              <p>
+                {q
+                  ? "没有找到匹配的记录。"
+                  : section === "comments" && status === "pending"
+                    ? "所有评论都已查看，暂时没有待审核的讨论。"
+                    : "这里暂时没有记录。"}
+              </p>
+            </div>
+          )}
+          {data && !!data.items.length && (
+            <ul className="admin-list">
+              {data.items.map((row) => (
+                <li key={row.id}>
+                  {"githubId" in row ? (
+                    <>
+                      <div className="admin-row-top">
+                        <div className="admin-person">
+                          <UserAvatar name={row.name} image={row.image} />
+                          <h3>{row.name}</h3>
+                        </div>
+                        <div className="admin-badges">
+                          <span className="role-badge">
+                            {row.role === "admin" ? "管理员" : "读者"}
+                          </span>
+                          {row.banned && (
+                            <span className="admin-badge">已停用</span>
+                          )}
+                          {row.self && (
+                            <span className="admin-badge">当前账号</span>
+                          )}
+                        </div>
                       </div>
-                      <div className="admin-badges">
-                        <span className="role-badge">
-                          {row.role === "admin" ? "管理员" : "读者"}
-                        </span>
-                        {row.banned && (
-                          <span className="admin-badge">已停用</span>
-                        )}
-                        {row.self && (
-                          <span className="admin-badge">当前账号</span>
-                        )}
-                      </div>
-                    </div>
-                    <p className="admin-meta">
-                      {row.githubUsername
-                        ? `@${row.githubUsername}`
-                        : "GitHub 用户"}
-                      {row.githubId && ` · ID ${row.githubId}`}
-                    </p>
-                    <p className="admin-meta">
-                      加入于 {communityDate(row.createdAt)} · {row.comments}{" "}
-                      条评论
-                    </p>
-                    {row.banned && row.banReason && (
-                      <p className="admin-reason">停用原因：{row.banReason}</p>
-                    )}
-                    <div className="admin-row-actions">
-                      <button
-                        className="plain-action"
-                        disabled={row.self}
-                        onClick={() =>
-                          action(row, row.banned ? "user.unban" : "user.ban")
-                        }
-                      >
-                        {row.banned ? "恢复账号" : "停用账号"}
-                      </button>
-                      <button
-                        className="plain-action"
-                        disabled={
-                          row.self || (row.banned && row.role !== "admin")
-                        }
-                        onClick={() =>
-                          action(
-                            row,
-                            row.role === "admin"
-                              ? "user.demote"
-                              : "user.promote",
-                          )
-                        }
-                      >
-                        {row.role === "admin" ? "设为普通用户" : "设为管理员"}
-                      </button>
-                    </div>
-                  </>
-                ) : "author" in row ? (
-                  <>
-                    <div className="admin-row-top">
-                      <div className="admin-person">
-                        <UserAvatar
-                          name={row.author.name}
-                          image={row.author.image}
-                        />
-                        <h3>{row.author.name}</h3>
-                      </div>
-                      <div className="admin-badges">
-                        <span className="admin-badge">
-                          {commentLabels[row.status]}
-                        </span>
-                        <span className="admin-meta">
-                          {row.isPublic ? "公开可见" : "未公开展示"}
-                        </span>
-                      </div>
-                    </div>
-                    <p className="admin-meta">
-                      <time dateTime={row.createdAt}>
-                        {auditDate(row.createdAt)}
-                      </time>{" "}
-                      · {row.parentId ? "回复" : "评论"}
-                    </p>
-                    <p className="admin-article">
-                      {row.article.href ? (
-                        <Link href={row.article.href}>{row.article.title}</Link>
-                      ) : (
-                        row.article.title
-                      )}
-                    </p>
-                    <p className="admin-comment-body">
-                      {row.status === "deleted" ? "正文已删除。" : row.body}
-                    </p>
-                    {row.parentHidden && (
                       <p className="admin-meta">
-                        所属评论已隐藏，这条回复也不会公开展示。
+                        {row.githubUsername
+                          ? `@${row.githubUsername}`
+                          : "GitHub 用户"}
+                        {row.githubId && ` · ID ${row.githubId}`}
                       </p>
-                    )}
-                    {row.status !== "deleted" && (
+                      <p className="admin-meta">
+                        加入于 {communityDate(row.createdAt)} · {row.comments}{" "}
+                        条评论
+                      </p>
+                      {row.banned && row.banReason && (
+                        <p className="admin-reason">
+                          停用原因：{row.banReason}
+                        </p>
+                      )}
                       <div className="admin-row-actions">
-                        {row.status === "pending" && (
-                          <button
-                            className="plain-action"
-                            onClick={() => action(row, "comment.approve")}
-                          >
-                            通过审核
-                          </button>
-                        )}
                         <button
                           className="plain-action"
+                          disabled={row.self}
+                          onClick={() =>
+                            action(row, row.banned ? "user.unban" : "user.ban")
+                          }
+                        >
+                          {row.banned ? "恢复账号" : "停用账号"}
+                        </button>
+                        <button
+                          className="plain-action"
+                          disabled={
+                            row.self || (row.banned && row.role !== "admin")
+                          }
                           onClick={() =>
                             action(
                               row,
-                              row.status === "hidden"
-                                ? "comment.restore"
-                                : "comment.hide",
+                              row.role === "admin"
+                                ? "user.demote"
+                                : "user.promote",
                             )
                           }
                         >
-                          {row.status === "hidden" ? "恢复展示" : "隐藏"}
-                        </button>
-                        <button
-                          className="plain-action muted-action"
-                          onClick={() => action(row, "comment.delete")}
-                        >
-                          删除
+                          {row.role === "admin" ? "设为普通用户" : "设为管理员"}
                         </button>
                       </div>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <div className="admin-row-top">
-                      <h3>
-                        {adminActions[row.action as AdminAction] || "管理操作"}
-                      </h3>
-                      <time className="admin-meta" dateTime={row.createdAt}>
-                        {auditDate(row.createdAt)}
-                      </time>
-                    </div>
-                    <p className="admin-target">{row.targetLabel}</p>
-                    <p className="admin-meta">
-                      {row.actorName} ·{" "}
-                      {row.source === "cli" ? "服务器" : "管理中心"}
-                    </p>
-                    <p className="admin-reason">{row.reason}</p>
-                  </>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-        {data && (
-          <nav className="admin-pagination" aria-label="列表分页">
-            <span>
-              共 {data.total} 条 · 第 {data.page} / {data.pages} 页
-            </span>
-            <div>
-              <button
-                className="plain-action"
-                disabled={page <= 1}
-                onClick={() => setPage((value) => value - 1)}
-              >
-                上一页
-              </button>
-              <button
-                className="plain-action"
-                disabled={page >= data.pages}
-                onClick={() => setPage((value) => value + 1)}
-              >
-                下一页
-              </button>
-            </div>
-          </nav>
-        )}
+                    </>
+                  ) : "author" in row ? (
+                    <>
+                      <div className="admin-row-top">
+                        <div className="admin-person">
+                          <UserAvatar
+                            name={row.author.name}
+                            image={row.author.image}
+                          />
+                          <h3>{row.author.name}</h3>
+                        </div>
+                        <div className="admin-badges">
+                          <span className="admin-badge">
+                            {commentLabels[row.status]}
+                          </span>
+                          <span className="admin-meta">
+                            {row.isPublic ? "公开可见" : "未公开展示"}
+                          </span>
+                        </div>
+                      </div>
+                      <p className="admin-meta">
+                        <time dateTime={row.createdAt}>
+                          {auditDate(row.createdAt)}
+                        </time>{" "}
+                        · {row.parentId ? "回复" : "评论"}
+                      </p>
+                      <p className="admin-article">
+                        {row.article.href ? (
+                          <Link href={row.article.href}>
+                            {row.article.title}
+                          </Link>
+                        ) : (
+                          row.article.title
+                        )}
+                      </p>
+                      <p className="admin-comment-body">
+                        {row.status === "deleted" ? "正文已删除。" : row.body}
+                      </p>
+                      {row.parentHidden && (
+                        <p className="admin-meta">
+                          所属评论已隐藏，这条回复也不会公开展示。
+                        </p>
+                      )}
+                      {row.status !== "deleted" && (
+                        <div className="admin-row-actions">
+                          {row.status === "pending" && (
+                            <button
+                              className="plain-action"
+                              onClick={() => action(row, "comment.approve")}
+                            >
+                              通过审核
+                            </button>
+                          )}
+                          <button
+                            className="plain-action"
+                            onClick={() =>
+                              action(
+                                row,
+                                row.status === "hidden"
+                                  ? "comment.restore"
+                                  : "comment.hide",
+                              )
+                            }
+                          >
+                            {row.status === "hidden" ? "恢复展示" : "隐藏"}
+                          </button>
+                          <button
+                            className="plain-action muted-action"
+                            onClick={() => action(row, "comment.delete")}
+                          >
+                            删除
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <div className="admin-row-top">
+                        <h3>
+                          {adminActions[row.action as AdminAction] ||
+                            "管理操作"}
+                        </h3>
+                        <time className="admin-meta" dateTime={row.createdAt}>
+                          {auditDate(row.createdAt)}
+                        </time>
+                      </div>
+                      <p className="admin-target">{row.targetLabel}</p>
+                      <p className="admin-meta">
+                        {row.actorName} ·{" "}
+                        {row.source === "cli" ? "服务器" : "管理中心"}
+                      </p>
+                      <p className="admin-reason">{row.reason}</p>
+                    </>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          {data && (
+            <nav className="admin-pagination" aria-label="列表分页">
+              <span>
+                共 {data.total} 条 · 第 {data.page} / {data.pages} 页
+              </span>
+              <div>
+                <button
+                  className="plain-action"
+                  disabled={page <= 1}
+                  onClick={() => {
+                    beginLoading();
+                    setPage((value) => value - 1);
+                  }}
+                >
+                  上一页
+                </button>
+                <button
+                  className="plain-action"
+                  disabled={page >= data.pages}
+                  onClick={() => {
+                    beginLoading();
+                    setPage((value) => value + 1);
+                  }}
+                >
+                  下一页
+                </button>
+              </div>
+            </nav>
+          )}
+        </div>
       </section>
       {target && (
         <Confirmation
@@ -571,6 +616,7 @@ export function AdminDashboard() {
           onDone={(message) => {
             setTarget(null);
             setNotice(message);
+            beginLoading();
             setRevision((value) => value + 1);
           }}
         />
