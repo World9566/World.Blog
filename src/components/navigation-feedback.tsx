@@ -44,9 +44,11 @@ export function NavigationFeedback() {
         return;
       const url = new URL(anchor.href);
       if (url.origin !== window.location.origin) return;
+      const instantFilters = anchor.closest("[data-instant-filters]");
       if (
-        anchor.closest("[data-instant-filters]") &&
-        url.pathname === "/articles"
+        instantFilters &&
+        url.pathname ===
+          (instantFilters.getAttribute("data-instant-filters") || "/articles")
       )
         return;
       if (

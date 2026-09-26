@@ -116,6 +116,32 @@ if (query) {
     result.includes(htmlText(articles[0].title)),
     "search finds published content",
   );
+  const filtered = await page(
+    `/search?${new URLSearchParams({ q: query, topic: articles[0].topic })}`,
+  );
+  assert.ok(
+    filtered.includes(htmlText(articles[0].title)),
+    "direct search links apply the initial topic filter",
+  );
+  const otherTopic = articles.find(
+    (article) => article.topic !== articles[0].topic,
+  );
+  if (otherTopic) {
+    const other = await page(
+      `/search?${new URLSearchParams({ q: query, topic: otherTopic.topic })}`,
+    );
+    assert.ok(
+      !other.includes(`href="/articles/${articles[0].slug}"`),
+      "initial topic filter excludes results from other topics",
+    );
+  }
+  const lastPage = await page(
+    `/search?${new URLSearchParams({ q: query, page: "999999" })}`,
+  );
+  assert.ok(
+    lastPage.includes('class="search-result"'),
+    "search clamps oversized pages",
+  );
 }
 const noResults = await page("/search?q=zzzz-nonexistent-blog-smoke-9566");
 assert.ok(noResults.includes("还没找到相关内容"), "search empty state");
