@@ -65,6 +65,7 @@ export function ArticleArchive({
       <nav className="filter-row secondary-tabbar" aria-label="文章专题筛选">
         <Link
           href="/articles"
+          prefetch={false}
           className={`filter-chip secondary-tab${!topic && !tag ? " selected" : ""}`}
           aria-current={!topic && !tag ? "page" : undefined}
         >
@@ -73,6 +74,7 @@ export function ArticleArchive({
         {topics.map((item) => (
           <Link
             href={`/articles?topic=${item.slug}`}
+            prefetch={false}
             key={item.slug}
             className={`filter-chip secondary-tab${topic === item.slug ? " selected" : ""}`}
             aria-current={topic === item.slug ? "page" : undefined}
@@ -84,7 +86,9 @@ export function ArticleArchive({
       {tag && (
         <div className="filter-summary">
           <span>标签：{tag}</span>
-          <Link href="/articles">清除筛选</Link>
+          <Link href="/articles" prefetch={false}>
+            清除筛选
+          </Link>
         </div>
       )}
       {filtered.length ? (
@@ -99,13 +103,18 @@ export function ArticleArchive({
         <div className="empty-state" key={`${topic}:${tag}`}>
           <h2>这里还没有文章。</h2>
           <p>换个专题，看看其他值得读的内容。</p>
-          <Link href="/articles" className="button button-primary">
+          <Link
+            href="/articles"
+            prefetch={false}
+            className="button button-primary"
+          >
             查看全部文章
           </Link>
         </div>
       )}
       <Pagination
         pathname="/articles"
+        prefetch={false}
         page={page}
         total={filtered.length}
         params={{ ...(topic ? { topic } : {}), ...(tag ? { tag } : {}) }}

@@ -101,7 +101,15 @@ export function parseArticle(source: string, filename: string): SourceArticle {
     if (node.type === "heading" || node.type === "code") break;
     if (node.type !== "paragraph") continue;
     const opening = plainText(node).replace(/\s+/g, " ").trim();
-    if (opening && opening !== description) preview = opening;
+    if (opening && opening !== description) {
+      // Previews are sent to archive clients; CSS line-clamping alone does not
+      // bound the transferred text when an opening paragraph is very long.
+      const characters = Array.from(opening);
+      preview =
+        characters.length > 240
+          ? `${characters.slice(0, 239).join("")}…`
+          : opening;
+    }
     break;
   }
   const slugger = new GithubSlugger();

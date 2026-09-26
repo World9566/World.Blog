@@ -1,3 +1,4 @@
+import Form from "next/form";
 import { Icon } from "./icon";
 
 export function SearchForm({
@@ -8,18 +9,13 @@ export function SearchForm({
   topic?: string;
 }) {
   return (
-    <form
-      key={`${query}:${topic}`}
-      action="/search"
-      method="get"
-      className="search-form"
-      role="search"
-    >
+    <Form action="/search" className="search-form" role="search">
       <label htmlFor="article-search" className="sr-only">
         搜索文章
       </label>
       <Icon name="search" width="24" height="24" />
       <input
+        key={`${query}:${topic}`}
         id="article-search"
         name="q"
         type="search"
@@ -33,6 +29,6 @@ export function SearchForm({
       <button type="submit" className="button button-primary">
         搜索
       </button>
-    </form>
+    </Form>
   );
 }

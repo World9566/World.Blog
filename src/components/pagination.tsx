@@ -11,11 +11,13 @@ export function Pagination({
   total,
   pathname,
   params = {},
+  prefetch,
 }: {
   page: number;
   total: number;
   pathname: string;
   params?: Record<string, string>;
+  prefetch?: boolean;
 }) {
   const count = Math.max(1, Math.ceil(total / PAGE_SIZE));
   if (count <= 1) return null;
@@ -25,7 +27,7 @@ export function Pagination({
   return (
     <nav className="pagination" aria-label="分页">
       {page > 1 ? (
-        <Link href={href(page - 1)} rel="prev">
+        <Link href={href(page - 1)} prefetch={prefetch} rel="prev">
           上一页
         </Link>
       ) : (
@@ -35,7 +37,7 @@ export function Pagination({
         {page} / {count}
       </span>
       {page < count ? (
-        <Link href={href(page + 1)} rel="next">
+        <Link href={href(page + 1)} prefetch={prefetch} rel="next">
           下一页
         </Link>
       ) : (

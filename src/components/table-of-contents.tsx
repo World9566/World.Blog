@@ -8,22 +8,56 @@ export function TableOfContents({ headings }: { headings: Heading[] }) {
   const desktopList = useRef<HTMLOListElement>(null);
   useEffect(() => {
     let frame = 0;
+    const elements = headings.flatMap((heading) => {
+      const element = document.getElementById(heading.id);
+      return element ? [{ id: heading.id, element }] : [];
+    });
+    let positions: { id: string; top: number }[] = [];
+    let dirty = true;
     function update() {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => {
-        let current = headings[0]?.id || "";
-        for (const heading of headings) {
-          const element = document.getElementById(heading.id);
-          if (element && element.getBoundingClientRect().top <= 150)
-            current = heading.id;
-        }
-        setActive(current);
-      });
+      frame = 0;
+      const scroll = window.scrollY;
+      // Measure only after layout changes, not once per heading per scroll.
+      if (dirty) {
+        positions = elements.map(({ id, element }) => ({
+          id,
+          top: element.getBoundingClientRect().top + scroll,
+        }));
+        dirty = false;
+      }
+      let low = 0,
+        high = positions.length;
+      while (low < high) {
+        const middle = (low + high) >>> 1;
+        if (positions[middle].top <= scroll + 150) low = middle + 1;
+        else high = middle;
+      }
+      setActive(positions[Math.max(0, low - 1)]?.id || "");
+    }
+    function schedule() {
+      if (!frame) frame = requestAnimationFrame(update);
+    }
+    function measure() {
+      dirty = true;
+      schedule();
     }
     update();
-    window.addEventListener("scroll", update, { passive: true });
+    const observer = new ResizeObserver(measure);
+    const main = document.getElementById("main-content");
+    const article = document.querySelector(".article-prose");
+    if (main) observer.observe(main);
+    if (article) observer.observe(article);
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", measure);
+    // Images and expandable MDX can move headings without a viewport resize.
+    main?.addEventListener("load", measure, true);
+    main?.addEventListener("toggle", measure, true);
     return () => {
-      window.removeEventListener("scroll", update);
+      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", measure);
+      main?.removeEventListener("load", measure, true);
+      main?.removeEventListener("toggle", measure, true);
+      observer.disconnect();
       cancelAnimationFrame(frame);
     };
   }, [headings]);

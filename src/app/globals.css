@@ -208,6 +208,8 @@ main[id="main-content"]:not(.route-skeleton) {
   background: var(--primary);
   box-shadow: 0 0 12px var(--primary);
   content: "";
+}
+.navigation-progress[data-visible="true"]::before {
   animation: navigation-sweep 1.1s ease-in-out infinite alternate;
 }
 @keyframes navigation-sweep {

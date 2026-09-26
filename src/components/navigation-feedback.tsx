@@ -10,12 +10,15 @@ export function NavigationFeedback() {
   const [pending, setPending] = useState(false);
   const pendingAnchor = useRef<HTMLAnchorElement | null>(null);
   const timeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clear = useCallback(() => {
     pendingAnchor.current?.removeAttribute("data-navigation-pending");
     pendingAnchor.current = null;
     if (timeout.current) clearTimeout(timeout.current);
     timeout.current = null;
+    if (showTimer.current) clearTimeout(showTimer.current);
+    showTimer.current = null;
     setPending(false);
   }, []);
 
@@ -54,7 +57,12 @@ export function NavigationFeedback() {
       pendingAnchor.current?.removeAttribute("data-navigation-pending");
       anchor.setAttribute("data-navigation-pending", "");
       pendingAnchor.current = anchor;
-      setPending(true);
+      if (showTimer.current) clearTimeout(showTimer.current);
+      // Avoid flashing the indicator for cached or immediate navigations.
+      showTimer.current = setTimeout(() => {
+        setPending(true);
+        showTimer.current = null;
+      }, 120);
       if (timeout.current) clearTimeout(timeout.current);
       timeout.current = setTimeout(clear, 15000);
     }
@@ -65,6 +73,7 @@ export function NavigationFeedback() {
       document.removeEventListener("click", onClick, true);
       window.removeEventListener("pageshow", clear);
       if (timeout.current) clearTimeout(timeout.current);
+      if (showTimer.current) clearTimeout(showTimer.current);
     };
   }, [clear]);
 

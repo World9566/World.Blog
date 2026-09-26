@@ -175,6 +175,18 @@ test("article previews use opening prose without pulling text from later section
   assert.equal(codeLed.preview, undefined);
 });
 
+test("long opening paragraphs produce bounded Unicode previews without truncating searchable text", () => {
+  const opening = "背景🙂".repeat(400) + "最后的内容仍可搜索";
+  const result = parseArticle(article({}, opening), "example.mdx");
+  assert.equal(Array.from(result.preview!).length, 240);
+  assert.equal(
+    result.preview,
+    Array.from(opening).slice(0, 239).join("") + "…",
+  );
+  assert.ok(result.preview!.isWellFormed());
+  assert.match(result.text, /最后的内容仍可搜索/);
+});
+
 test("unsafe filenames are rejected with an actionable error", async () => {
   await withDirectory({ "Bad Name.mdx": article() }, async (directory) => {
     await assert.rejects(

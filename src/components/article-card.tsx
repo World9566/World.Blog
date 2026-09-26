@@ -47,7 +47,11 @@ export function ArticleCard({
         {archive && article.tags.length > 0 && (
           <div className="card-tags" aria-label="文章标签">
             {article.tags.map((tag) => (
-              <Link href={`/articles?tag=${encodeURIComponent(tag)}`} key={tag}>
+              <Link
+                href={`/articles?tag=${encodeURIComponent(tag)}`}
+                prefetch={false}
+                key={tag}
+              >
                 {tag}
               </Link>
             ))}

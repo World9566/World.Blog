@@ -5,8 +5,10 @@ import { useEffect, useRef } from "react";
 export function ReadingProgress() {
   const bar = useRef<HTMLDivElement>(null);
   useEffect(() => {
+    const article = document.querySelector(".article-prose");
+    let frame = 0;
     function update() {
-      const article = document.querySelector(".article-prose");
+      frame = 0;
       if (!article || !bar.current) return;
       const rect = article.getBoundingClientRect();
       const progress = Math.min(
@@ -19,12 +21,19 @@ export function ReadingProgress() {
       );
       bar.current.style.transform = `scaleX(${progress})`;
     }
+    function schedule() {
+      if (!frame) frame = requestAnimationFrame(update);
+    }
     update();
-    window.addEventListener("scroll", update, { passive: true });
-    window.addEventListener("resize", update);
+    const observer = new ResizeObserver(schedule);
+    if (article) observer.observe(article);
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
     return () => {
-      window.removeEventListener("scroll", update);
-      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+      observer.disconnect();
+      cancelAnimationFrame(frame);
     };
   }, []);
   return (

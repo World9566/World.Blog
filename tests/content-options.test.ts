@@ -3,6 +3,7 @@ import {
   copyFile,
   mkdir,
   mkdtemp,
+  readFile,
   rm,
   symlink,
   writeFile,
@@ -283,7 +284,10 @@ test("topic media follows published topics, metadata edits, release switches and
     const image = await media("replacement");
     assert.equal(image.status, 200);
     assert.equal(image.headers.get("content-type"), "image/png");
-    assert.equal(image.headers.get("cache-control"), "no-store");
+    assert.equal(
+      image.headers.get("cache-control"),
+      "private, no-cache, must-revalidate",
+    );
     assert.ok((await image.arrayBuffer()).byteLength > 0);
     process.env.CONTENT_DIR = second.directory;
     await writeFile(
@@ -304,6 +308,66 @@ test("topic media follows published topics, metadata edits, release switches and
     else process.env.CONTENT_DIR = saved;
     await first.cleanup();
     await second.cleanup();
+  }
+});
+
+test("media revalidation saves bytes without retaining replaced or unpublished covers", async () => {
+  const f = await fixture();
+  const saved = process.env.CONTENT_DIR;
+  try {
+    process.env.CONTENT_DIR = f.directory;
+    const post = path.join(f.directory, "first.mdx");
+    await writeFile(post, article("first", { cover: "/media/cover.png" }));
+    await refreshContent();
+    const get = (etag?: string) =>
+      GET(
+        new Request("http://localhost/media/cover.png", {
+          headers: etag ? { "If-None-Match": etag } : {},
+        }),
+        { params: Promise.resolve({ path: ["cover.png"] }) },
+      );
+    const original = await get();
+    const etag = original.headers.get("etag")!;
+    assert.match(etag, /^"[a-f0-9]{64}"$/);
+    assert.ok((await original.arrayBuffer()).byteLength > 0);
+    for (const match of [etag, `W/${etag}`, `"other", W/${etag}`, "*"]) {
+      const cached = await get(match);
+      assert.equal(cached.status, 304);
+      assert.equal(cached.headers.get("etag"), etag);
+      assert.equal(
+        cached.headers.get("cache-control"),
+        "private, no-cache, must-revalidate",
+      );
+      assert.equal((await cached.arrayBuffer()).byteLength, 0);
+    }
+    assert.equal((await get('"different"')).status, 200);
+    const imageFile = path.join(f.root, "media", "cover.png");
+    const bytes = await readFile(imageFile);
+    await writeFile(imageFile, Buffer.concat([bytes, Buffer.from("changed")]));
+    await refreshContent();
+    const changed = await get(etag);
+    assert.equal(changed.status, 200);
+    const changedTag = changed.headers.get("etag")!;
+    assert.notEqual(changedTag, etag);
+    await writeFile(imageFile, bytes);
+    await refreshContent();
+    const restored = await get(changedTag);
+    assert.equal(restored.status, 200);
+    assert.equal(restored.headers.get("etag"), etag);
+    await writeFile(
+      post,
+      article("first", { cover: "/media/cover.png", draft: true }),
+    );
+    await refreshContent();
+    for (const match of [etag, "*"]) {
+      const unpublished = await get(match);
+      assert.equal(unpublished.status, 404);
+      assert.equal(unpublished.headers.get("cache-control"), "no-store");
+    }
+  } finally {
+    if (saved === undefined) delete process.env.CONTENT_DIR;
+    else process.env.CONTENT_DIR = saved;
+    await f.cleanup();
   }
 });
 
@@ -374,7 +438,10 @@ test("runtime reloads topic changes and serves only published cover references a
       { params: Promise.resolve({ path: ["cover.png"] }) },
     );
     assert.equal(response.status, 200);
-    assert.equal(response.headers.get("cache-control"), "no-store");
+    assert.equal(
+      response.headers.get("cache-control"),
+      "private, no-cache, must-revalidate",
+    );
     process.env.CONTENT_DIR = second.directory;
     await writeFile(
       path.join(second.directory, "second.mdx"),
