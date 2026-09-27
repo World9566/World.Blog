@@ -55,17 +55,17 @@ export function renderStatus(report) {
   const names = Object.fromEntries(
     checks.map((check) => [check.id, check.name]),
   );
-  return `<section class="summary tone-${overall}" aria-labelledby="status-heading"><span class="summary-symbol" aria-hidden="true">${overall === "operational" ? "✓" : overall === "outage" ? "!" : "·"}</span><h1 id="status-heading">${headlines[overall]}</h1><p class="lead">${descriptions[overall]}</p><p class="timestamp">最近检查：<time>${escapeHtml(date(checked))}</time></p></section>
+  return `<section class="summary tone-${overall}" aria-labelledby="status-heading"><span class="summary-symbol" aria-hidden="true">${overall === "operational" ? "✓" : overall === "outage" ? "!" : "·"}</span><div class="summary-copy"><h1 id="status-heading">${headlines[overall]}</h1><p class="lead">${descriptions[overall]}</p><p class="timestamp">最近检查：<time>${escapeHtml(date(checked))}</time></p></div></section>
   <section class="services" aria-labelledby="services-heading"><div class="section-heading"><h2 id="services-heading">服务可用情况</h2><span>最近 30 天</span></div><div class="service-list">${checks
     .map((check) => {
       const status = state(check.status);
       const passed = check.history.reduce((sum, day) => sum + day.passed, 0);
       const total = check.history.reduce((sum, day) => sum + day.total, 0);
-      return `<article class="service"><div class="service-heading"><h3>${escapeHtml(check.name)}</h3><span class="component-state tone-${status}"><i class="dot" aria-hidden="true"></i>${labels[status]}</span></div><div class="history" aria-hidden="true">${check.history.map((day, index) => `<i class="bar tone-${historyState(day, index)}" title="${escapeHtml(day.day)}：${day.total ? `${day.passed}/${day.total} 次检查通过` : "暂无数据"}"></i>`).join("")}</div><div class="history-caption"><span>${escapeHtml(check.history[0]?.day || "")}</span><span>检查通过率 ${percentage(passed, total)}</span><span>今天</span></div></article>`;
+      return `<article class="service"><div class="service-heading"><h3>${escapeHtml(check.name)}</h3><p class="pass-rate">检查通过率 ${percentage(passed, total)}</p></div><div class="history" aria-hidden="true">${check.history.map((day, index) => `<i class="bar tone-${historyState(day, index)}" title="${escapeHtml(day.day)}：${day.total ? `${day.passed}/${day.total} 次检查通过` : "暂无数据"}"></i>`).join("")}</div><span class="component-state tone-${status}"><i class="dot" aria-hidden="true"></i>${labels[status]}</span></article>`;
     })
     .join(
       "",
-    )}</div><div class="legend"><span><i class="dot tone-operational"></i>正常</span><span><i class="dot tone-outage"></i>出现异常</span><span><i class="dot tone-unknown"></i>数据不足</span></div><p class="history-note">可用情况来自定时访问检查，不代表每个地区的连接质量。尚未收集的时段不会计为正常。</p><details><summary>查看每日检查明细</summary><div class="table-scroll"><table><caption>每日检查结果</caption><thead><tr><th>日期</th>${checks.map((check) => `<th>${escapeHtml(check.name)}</th>`).join("")}</tr></thead><tbody>${(
+    )}</div><div class="history-footer"><span class="history-range">${escapeHtml(checks[0]?.history[0]?.day || "")} 至今天</span><div class="legend"><span><i class="dot tone-operational"></i>正常</span><span><i class="dot tone-outage"></i>出现异常</span><span><i class="dot tone-unknown"></i>数据不足</span></div></div><details><summary>查看每日检查明细</summary><p class="history-note">可用情况来自定时访问检查，不代表每个地区的连接质量。尚未收集的时段不会计为正常。</p><div class="table-scroll"><table><caption>每日检查结果</caption><thead><tr><th>日期</th>${checks.map((check) => `<th>${escapeHtml(check.name)}</th>`).join("")}</tr></thead><tbody>${(
     checks[0]?.history || []
   )
     .map(
@@ -79,7 +79,7 @@ export function renderStatus(report) {
     )
     .reverse()
     .join("")}</tbody></table></div></details></section>
-  <section class="incidents" aria-labelledby="incidents-heading"><div class="section-heading"><h2 id="incidents-heading">故障与恢复记录</h2><span>最近 90 天</span></div>${report.incidents?.length ? `<ol>${report.incidents.map((incident) => `<li><div class="incident-heading"><h3>${escapeHtml(names[incident.component] || "网站访问")}访问异常</h3><span class="component-state tone-${incident.resolvedAt ? "operational" : "outage"}">${incident.resolvedAt ? "已恢复" : "尚未恢复"}</span></div><p>${incident.resolvedAt ? "访问已恢复，相关检查已通过。" : "已连续检测到访问异常，正在持续检查。"}</p><time>开始于 ${escapeHtml(date(incident.startedAt))}${incident.resolvedAt ? ` · 恢复于 ${escapeHtml(date(incident.resolvedAt))}` : ""}</time></li>`).join("")}</ol>` : `<div class="empty"><span aria-hidden="true">${overall === "operational" ? "✓" : "·"}</span><h3>${checked ? "暂无已确认的故障记录" : "等待首次检查"}</h3><p>${checked ? "新的故障与恢复记录会在这里更新。" : "检查开始后，服务状态和历史记录将逐步更新。"}</p></div>`}</section>`;
+  <section class="incidents" aria-labelledby="incidents-heading"><div class="section-heading"><h2 id="incidents-heading">故障与恢复记录</h2><span>最近 90 天</span></div>${report.incidents?.length ? `<ol>${report.incidents.map((incident) => `<li><div class="incident-heading"><h3>${escapeHtml(names[incident.component] || "网站访问")}访问异常</h3><span class="component-state tone-${incident.resolvedAt ? "operational" : "outage"}">${incident.resolvedAt ? "已恢复" : "尚未恢复"}</span></div><p>${incident.resolvedAt ? "访问已恢复，相关检查已通过。" : "已连续检测到访问异常，正在持续检查。"}</p><time>开始于 ${escapeHtml(date(incident.startedAt))}${incident.resolvedAt ? ` · 恢复于 ${escapeHtml(date(incident.resolvedAt))}` : ""}</time></li>`).join("")}</ol>` : `<div class="empty"><span aria-hidden="true">${overall === "operational" ? "✓" : "·"}</span><div><h3>${checked ? "暂无已确认的故障记录" : "等待首次检查"}</h3><p>${checked ? "新的故障与恢复记录会在这里更新。" : "检查开始后，服务状态和历史记录将逐步更新。"}</p></div></div>`}</section>`;
 }
 
 if (typeof document !== "undefined") {
