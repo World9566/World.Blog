@@ -3,6 +3,7 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { parseProfile } from "@/lib/account-policy";
+import { PendingLabel } from "./pending-label";
 
 export function ProfileForm({
   initialName,
@@ -105,8 +106,11 @@ export function ProfileForm({
           className="button button-primary"
           type="submit"
           disabled={busy || (name === saved.name && bio === saved.bio)}
+          aria-busy={busy}
         >
-          {busy ? "正在保存…" : "保存修改"}
+          <PendingLabel pending={busy} label="正在保存">
+            保存修改
+          </PendingLabel>
         </button>
         <p
           role={error ? "alert" : "status"}

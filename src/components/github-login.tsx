@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { authClient } from "@/lib/auth-client";
 import { Icon } from "./icon";
+import { PendingLabel } from "./pending-label";
 
 export function GitHubLogin({
   returnTo,
@@ -40,10 +41,13 @@ export function GitHubLogin({
         className="button button-primary github-login"
         type="button"
         disabled={!available || busy}
+        aria-busy={busy}
         onClick={login}
       >
-        <Icon name="github" width="22" height="22" />
-        {busy ? "正在前往 GitHub…" : "使用 GitHub 继续"}
+        <PendingLabel pending={busy} label="正在前往 GitHub">
+          <Icon name="github" width="22" height="22" />
+          使用 GitHub 继续
+        </PendingLabel>
       </button>
       {!available && (
         <p className="form-notice" role="status">

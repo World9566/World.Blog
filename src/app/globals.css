@@ -2438,6 +2438,44 @@ main[id="main-content"]:not(.route-skeleton) {
   width: 100%;
   height: 14px;
 }
+.loading-spinner {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: loading-spin 0.75s linear infinite;
+}
+@keyframes loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.pending-label {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: inherit;
+}
+.pending-label-idle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: inherit;
+}
+.pending-label[data-pending] .pending-label-idle {
+  visibility: hidden;
+}
+.pending-label-progress {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 .search-results-skeleton {
   min-width: 0;
 }
@@ -3300,6 +3338,37 @@ main[id="main-content"]:not(.route-skeleton) {
   padding-top: 20px;
   margin-top: 16px;
 }
+.comment-skeleton-row {
+  padding-block: 24px;
+  border-bottom: 1px solid var(--soft-divider);
+}
+.comment-skeleton-author {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.comment-skeleton-avatar {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+.comment-skeleton-name {
+  width: min(28%, 120px);
+}
+.comment-skeleton-date {
+  width: min(24%, 90px);
+  height: 10px;
+  margin-left: auto;
+}
+.comment-skeleton-body {
+  width: 90%;
+  margin-bottom: 12px;
+}
+.comment-skeleton-detail {
+  width: 62%;
+}
 .reply-composer {
   margin-top: 16px;
 }
@@ -3349,6 +3418,43 @@ main[id="main-content"]:not(.route-skeleton) {
 }
 .nested-tabbar.activity-tabs button[aria-pressed="true"] {
   box-shadow: inset 0 -3px var(--primary);
+}
+#reading:hover {
+  transform: none;
+}
+.activity-results {
+  min-height: 224px;
+}
+.activity-skeleton-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+  padding-block: 24px;
+  border-bottom: 1px solid var(--soft-divider);
+}
+.activity-skeleton-copy {
+  flex: 1;
+  min-width: 0;
+}
+.activity-skeleton-title {
+  width: 72%;
+  height: 18px;
+  margin-bottom: 12px;
+}
+.activity-skeleton-excerpt {
+  width: 90%;
+  height: 12px;
+  margin-bottom: 10px;
+}
+.activity-skeleton-date {
+  width: min(35%, 100px);
+  height: 10px;
+}
+.activity-skeleton-action {
+  width: 56px;
+  height: 12px;
+  margin-top: 4px;
+  flex-shrink: 0;
 }
 .activity-empty {
   padding-block: 32px 8px;

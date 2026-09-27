@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "./icon";
+import { PendingLabel } from "./pending-label";
 
 export type SessionItem = {
   id: string;
@@ -62,11 +63,17 @@ export function SessionList({ sessions }: { sessions: SessionItem[] }) {
               <button
                 className="session-revoke"
                 disabled={!!pending}
+                aria-busy={pending === session.id}
                 type="button"
                 onClick={() => revoke(session.id)}
                 aria-label={`退出 ${session.device}，登录于 ${session.createdAt}`}
               >
-                {pending === session.id ? "正在退出…" : "退出此设备"}
+                <PendingLabel
+                  pending={pending === session.id}
+                  label="正在退出此设备"
+                >
+                  退出此设备
+                </PendingLabel>
               </button>
             )}
           </li>
@@ -76,10 +83,13 @@ export function SessionList({ sessions }: { sessions: SessionItem[] }) {
         <button
           className="button button-secondary"
           disabled={!!pending}
+          aria-busy={pending === "others"}
           onClick={() => revoke()}
           type="button"
         >
-          {pending === "others" ? "正在退出…" : "退出其他设备"}
+          <PendingLabel pending={pending === "others"} label="正在退出其他设备">
+            退出其他设备
+          </PendingLabel>
         </button>
       )}
       <p

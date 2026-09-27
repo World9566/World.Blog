@@ -18,6 +18,7 @@ import {
 } from "@/lib/community-client";
 import { UserAvatar } from "./user-avatar";
 import { AdminListSkeleton } from "./admin-list-skeleton";
+import { PendingLabel } from "./pending-label";
 
 type Section = "comments" | "users" | "audit";
 type Row = AdminComment | AdminUser | AuditView;
@@ -161,8 +162,11 @@ function Confirmation({
           <button
             className="button button-primary"
             disabled={busy || reason.trim().length < 2}
+            aria-busy={busy}
           >
-            {busy ? "正在处理…" : "确认"}
+            <PendingLabel pending={busy} label="正在处理">
+              确认
+            </PendingLabel>
           </button>
           <button
             type="button"

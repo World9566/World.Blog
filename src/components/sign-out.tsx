@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { authClient } from "@/lib/auth-client";
+import { PendingLabel } from "./pending-label";
 
 export function SignOut() {
   const [busy, setBusy] = useState(false);
@@ -22,10 +23,13 @@ export function SignOut() {
       <button
         className="button button-secondary"
         disabled={busy}
+        aria-busy={busy}
         onClick={signOut}
         type="button"
       >
-        {busy ? "正在退出…" : "退出登录"}
+        <PendingLabel pending={busy} label="正在退出">
+          退出登录
+        </PendingLabel>
       </button>
       {error && (
         <p className="form-error" role="alert">

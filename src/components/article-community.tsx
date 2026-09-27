@@ -24,6 +24,8 @@ import {
 import { Icon } from "./icon";
 import { CopyButton } from "./copy-button";
 import { UserAvatar } from "./user-avatar";
+import { CommentSkeleton } from "./community-skeleton";
+import { LoadingSpinner, PendingLabel } from "./pending-label";
 
 type CommunityData = { state: InteractionState; comments: CommentPage };
 const messageOf = (error: unknown) =>
@@ -98,8 +100,11 @@ function CommentComposer({
         <button
           className="button button-primary"
           disabled={busy || !body.trim()}
+          aria-busy={busy}
         >
-          {busy ? "正在发布…" : parentId ? "发布回复" : "发布评论"}
+          <PendingLabel pending={busy} label="正在发布">
+            {parentId ? "发布回复" : "发布评论"}
+          </PendingLabel>
         </button>
         {onCancel && (
           <button
@@ -178,8 +183,15 @@ function CommentEntry({
         {confirm && (
           <div className="comment-confirm">
             <span>删除这条评论？</span>
-            <button className="plain-action" disabled={busy} onClick={remove}>
-              {busy ? "正在删除…" : "确认删除"}
+            <button
+              className="plain-action"
+              disabled={busy}
+              aria-busy={busy}
+              onClick={remove}
+            >
+              <PendingLabel pending={busy} label="正在删除">
+                确认删除
+              </PendingLabel>
             </button>
             <button
               className="plain-action muted-action"
@@ -228,7 +240,9 @@ function CommentThread({
     setError("");
     setReplies(null);
     communityFetch<CommentPage>(url, { signal: controller.signal })
-      .then(setReplies)
+      .then((page) => {
+        if (!controller.signal.aborted) setReplies(page);
+      })
       .catch((error) => {
         if (!controller.signal.aborted) setError(messageOf(error));
       })
@@ -238,6 +252,7 @@ function CommentThread({
     return () => controller.abort();
   }, [expanded, url, version]);
   async function more() {
+    if (busy) return;
     setBusy(true);
     setError("");
     try {
@@ -305,7 +320,7 @@ function CommentThread({
         </div>
       )}
       {expanded && (
-        <div className="comment-replies">
+        <div className="comment-replies" aria-busy={busy}>
           {replies?.items.map((reply) => (
             <CommentEntry
               key={reply.id}
@@ -314,19 +329,22 @@ function CommentThread({
               onDeleted={() => onChanged("回复已删除。")}
             />
           ))}
-          {busy && (
-            <p className="community-muted" role="status">
-              正在加载回复…
-            </p>
-          )}
+          {busy && !replies && <CommentSkeleton replies />}
           {error && (
             <p className="form-error" role="alert">
               {error}
             </p>
           )}
-          {(replies?.nextCursor || error) && (
-            <button className="plain-action" disabled={busy} onClick={more}>
-              {error ? "重试" : "更多回复"}
+          {(replies?.nextCursor || error || (busy && replies)) && (
+            <button
+              className="plain-action"
+              disabled={busy}
+              aria-busy={busy}
+              onClick={more}
+            >
+              <PendingLabel pending={busy} label="正在加载更多回复">
+                {error ? "重试" : "更多回复"}
+              </PendingLabel>
             </button>
           )}
           {replies && !replies.items.length && !busy && (
@@ -351,7 +369,11 @@ export function ArticleCommunity({
   const loginHref = `/login?next=${encodeURIComponent(`/articles/${slug}#comments`)}`;
   const [data, setData] = useState<CommunityData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [pending, setPending] = useState<"like" | "bookmark" | "more" | null>(
+    null,
+  );
+  const busy = pending !== null;
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [version, setVersion] = useState(0);
@@ -371,17 +393,23 @@ export function ArticleCommunity({
   }, [actionTarget]);
   const reload = useCallback(
     async (signal?: AbortSignal) => {
-      setError("");
+      setRefreshing(true);
       try {
         const next = await communityFetch<CommunityData>(`${api}/community`, {
           signal,
         });
-        setData(next);
-        setVersion((value) => value + 1);
+        if (!signal?.aborted) {
+          setError("");
+          setData(next);
+          setVersion((value) => value + 1);
+        }
       } catch (error) {
         if (!signal?.aborted) setError(messageOf(error));
       } finally {
-        if (!signal?.aborted) setLoading(false);
+        if (!signal?.aborted) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       }
     },
     [api],
@@ -401,7 +429,7 @@ export function ArticleCommunity({
       window.location.assign(loginHref);
       return;
     }
-    setBusy(true);
+    setPending(kind);
     setError("");
     setNotice("");
     const active = kind === "like" ? !data.state.liked : !data.state.bookmarked;
@@ -425,12 +453,12 @@ export function ArticleCommunity({
     } catch (error) {
       setError(messageOf(error));
     } finally {
-      setBusy(false);
+      setPending(null);
     }
   }
   async function more() {
     if (!data?.comments.nextCursor || busy) return;
-    setBusy(true);
+    setPending("more");
     setError("");
     try {
       const page = await communityFetch<CommentPage>(
@@ -458,7 +486,7 @@ export function ArticleCommunity({
     } catch (error) {
       setError(messageOf(error));
     } finally {
-      setBusy(false);
+      setPending(null);
     }
   }
   const changed = (message: string) => {
@@ -481,9 +509,10 @@ export function ArticleCommunity({
               aria-pressed={data?.state.liked || false}
               title={data?.state.liked ? "取消点赞" : "点赞文章"}
               disabled={!data || busy}
+              aria-busy={pending === "like"}
               onClick={() => void react("like")}
             >
-              <Icon name="heart" />
+              {pending === "like" ? <LoadingSpinner /> : <Icon name="heart" />}
               <span className="article-action-count">
                 {data?.state.likes ?? 0}
               </span>
@@ -531,9 +560,14 @@ export function ArticleCommunity({
             className="reaction-button"
             aria-pressed={data?.state.bookmarked || false}
             disabled={!data || busy}
+            aria-busy={pending === "bookmark"}
             onClick={() => react("bookmark")}
           >
-            <Icon name="bookmark" />
+            {pending === "bookmark" ? (
+              <LoadingSpinner />
+            ) : (
+              <Icon name="bookmark" />
+            )}
             <span>{data?.state.bookmarked ? "已收藏" : "收藏文章"}</span>
           </button>
         </div>
@@ -547,9 +581,7 @@ export function ArticleCommunity({
           <p>好问题，让理解更进一步。</p>
         </div>
         {loading ? (
-          <p className="community-muted" role="status">
-            正在加载讨论…
-          </p>
+          <CommentSkeleton />
         ) : viewer ? (
           <CommentComposer api={api} onPosted={() => changed("评论已发布。")} />
         ) : (
@@ -568,11 +600,23 @@ export function ArticleCommunity({
         )}
         {error && (
           <div className="community-notice">
-            <p role="alert" className="form-error">
-              {error}
-            </p>
-            <button className="plain-action" onClick={() => void reload()}>
-              重新加载
+            {!refreshing && (
+              <p role="alert" className="form-error">
+                {error}
+              </p>
+            )}
+            <button
+              className="plain-action"
+              disabled={refreshing}
+              aria-busy={refreshing}
+              onClick={() => {
+                if (!data) setLoading(true);
+                void reload();
+              }}
+            >
+              <PendingLabel pending={refreshing} label="正在重新加载讨论">
+                重新加载
+              </PendingLabel>
             </button>
             {!viewer && (
               <Link href={loginHref} className="plain-action">
@@ -607,9 +651,15 @@ export function ArticleCommunity({
               <button
                 className="button button-secondary comment-more"
                 disabled={busy}
+                aria-busy={pending === "more"}
                 onClick={more}
               >
-                {busy ? "正在加载…" : "更多评论"}
+                <PendingLabel
+                  pending={pending === "more"}
+                  label="正在加载更多评论"
+                >
+                  更多评论
+                </PendingLabel>
               </button>
             )}
           </>
