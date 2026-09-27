@@ -10,7 +10,10 @@
     "MAIN_ORIGIN": "https://www.world9566.online",
     "STATUS_ORIGIN": "https://status.world9566.online",
   },
-  "routes": [{ "pattern": "status.world9566.online", "custom_domain": true }],
+  "routes": [
+  { "pattern": "status.world9566.online", "custom_domain": true },
+  { "pattern": "www.world9566.online/*", "zone_name": "world9566.online" }
+],
   "triggers": { "crons": ["* * * * *"] },
   "assets": {
     "directory": "./public",
@@ -21,8 +24,7 @@
     {
       "binding": "DB",
       "database_name": "world-blog-status",
-      // Replace with the ID returned by `wrangler d1 create world-blog-status`.
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "212c516a-ea07-4af6-965b-288c7a7ae20e",
       "migrations_dir": "migrations",
     },
   ],
