@@ -8,7 +8,7 @@ backups
 .agents
 AGENTS.md
 docs
-DESIGN.md
+/*.md
 .github
 .devcontainer
 .vscode

@@ -17,7 +17,8 @@ build-info.json
 
 # Local notes, tools, editor state and temporary files
 /docs/
-/DESIGN.md
+/*.md
+!/README.md
 AGENTS.md
 # Articles live in the content repository; this is a local development clone
 /content/
