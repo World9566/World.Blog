@@ -8,7 +8,18 @@ previous=""
 [[ ! -f "$STATE_DIR/current-release" ]] || previous=$(cat "$STATE_DIR/current-release")
 export BLOG_RELEASE=$target
 dc config --quiet
-if [[ "${BLOG_SKIP_PULL:-0}" != 1 ]]; then dc pull postgres meilisearch gateway web ops; fi
+if [[ "${BLOG_SKIP_PULL:-0}" != 1 ]]; then
+  # Bound the whole existing parallel pull, leaving time before the Actions
+  # deadline. No service has been stopped and no migration has started yet.
+  if dc_with_timeout 15m pull postgres meilisearch gateway web ops; then :
+  else
+    result=$?
+    if [[ "$result" == 124 || "$result" == 137 ]]; then
+      echo 'Image pull exceeded 15 minutes. Running services were preserved; the deployment lock will be released. Retry the deployment after checking registry connectivity.' >&2
+    fi
+    exit "$result"
+  fi
+fi
 image_revision=$("${DOCKER[@]}" image inspect "$BLOG_IMAGE:$target" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')
 [[ "$image_revision" == "$target" ]] || { echo 'Image revision does not match requested release.' >&2; exit 1; }
 dc run --rm --no-deps ops node scripts/ops/check-env.mjs

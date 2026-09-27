@@ -50,6 +50,14 @@ systemctl list-timers world-blog-backup.timer world-blog-monitor.timer
 journalctl -u world-blog-monitor.service -u world-blog-backup.service --since today
 ```
 
+## 部署占锁与拉取超时
+
+应用发布、内容发布、备份和恢复共用 `.deploy/<项目名>/operation.lock`。看到 `Another operation is active` 时，先检查服务器上的维护进程；Actions 已取消或超时，不代表远端 SSH 启动的进程已经退出。不要在旧进程仍运行时直接删除锁。
+
+应用部署对整个并行镜像拉取设置 15 分钟上限，随后最多等待 15 秒强制终止拉取客户端。超时发生在停止网站和执行迁移之前，会返回失败并清理部署锁、临时 Compose 配置；已运行的版本继续服务。deploy 作业的总时限为 30 分钟，为后续备份、迁移和健康检查留出时间。镜像源和拉取并发方式沿用原配置，不自动重试。此限制只覆盖镜像拉取阶段，不代替其他阶段的故障排查。
+
+旧版本遗留任务需要先确认 PID、所属部署、当前阶段和子进程，结束对应任务，确认它及子进程均退出后，才能清理残留的空锁目录。不要终止 Docker 守护进程或运行中的网站容器。
+
 ## 本地备份与保留
 
 每天服务器时区 04:30 后 15 分钟内执行备份。部署正在进行时会推迟，失败后 systemd 每 15 分钟重试。备份和内容/应用发布共用维护锁，内容快照不会在打包中途被切换或清理。

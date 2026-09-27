@@ -89,6 +89,16 @@ dc() {
   rm -f -- "$release_env"
   return "$result"
 }
+dc_with_timeout() {
+  local duration=$1
+  shift
+  command -v timeout >/dev/null || { echo 'GNU timeout is required for bounded image pulls.' >&2; return 1; }
+  # Put timeout AFTER sudo so it can terminate the root-owned Compose CLI
+  # and its plugin too. The calling shell stays alive to clean up its lock.
+  local docker_index=$(( ${#DOCKER[@]} - 1 ))
+  local -a DOCKER=("${DOCKER[@]:0:docker_index}" timeout --signal=TERM --kill-after=15s "$duration" "${DOCKER[docker_index]}")
+  dc "$@"
+}
 sql() { dc exec -T postgres sh -c 'exec psql -X -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At' <<< "$1"; }
 schema_version() {
   local exists

@@ -114,6 +114,77 @@ export -f docker sudo curl df timeout
 }
 
 test(
+  "timed pulls terminate their CLI and release the lock with direct Docker or sudo",
+  { skip: !linux },
+  () => {
+    const f = fixture();
+    try {
+      writeFileSync(
+        path.join(f.root, "fake-docker"),
+        `#!/usr/bin/env bash
+set -eu
+printf '%s\\n' "$$" > "$TEST_ROOT/pull.pid"
+printf '%s\\n' "$@" > "$TEST_ROOT/pull.args"
+[[ "$TEST_FAULT" != failure ]] || exit 23
+exec sleep 60
+`,
+        { mode: 0o700 },
+      );
+      writeFileSync(
+        path.join(f.root, "fake-sudo"),
+        `#!/usr/bin/env bash
+set -eu
+[[ "$1" == -n ]]; shift
+printf '%s\\n' "$@" > "$TEST_ROOT/sudo.args"
+exec "$@"
+`,
+        { mode: 0o700 },
+      );
+      writeFileSync(
+        path.join(f.root, "scripts/ops/timed-pull.sh"),
+        `#!/usr/bin/env bash
+set -Eeuo pipefail
+source "$(dirname -- "$0")/common.sh"
+lock_operation
+# Use GNU timeout itself, not the monitor test double.
+unset -f timeout
+DOCKER=("$ROOT/fake-docker")
+[[ "$TEST_FAULT" != sudo ]] || DOCKER=("$ROOT/fake-sudo" -n "$ROOT/fake-docker")
+dc_with_timeout 1s pull postgres meilisearch gateway web ops
+`,
+      );
+      for (const mode of ["direct", "sudo", "failure"]) {
+        const result = f.run("timed-pull.sh", [], mode);
+        assert.equal(
+          result.status,
+          mode === "failure" ? 23 : 124,
+          result.output,
+        );
+        assert.equal(existsSync(path.join(f.state, "operation.lock")), false);
+        assert.equal(
+          readdirSync(f.state).some((name) =>
+            name.startsWith("compose-release."),
+          ),
+          false,
+        );
+        const pid = Number(readFileSync(path.join(f.root, "pull.pid"), "utf8"));
+        assert.throws(() => process.kill(pid, 0), { code: "ESRCH" });
+        assert.match(
+          readFileSync(path.join(f.root, "pull.args"), "utf8"),
+          /pull\npostgres\nmeilisearch\ngateway\nweb\nops\n$/,
+        );
+      }
+      assert.match(
+        readFileSync(path.join(f.root, "sudo.args"), "utf8"),
+        /^timeout\n--signal=TERM\n--kill-after=15s\n1s\n/,
+      );
+    } finally {
+      f.cleanup();
+    }
+  },
+);
+
+test(
   "monitor confirms failures, records one incident/recovery and keeps running without Docker",
   { skip: !linux },
   () => {
