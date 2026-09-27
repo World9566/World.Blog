@@ -27,7 +27,11 @@ export default async function ArticlesPage() {
     readingMinutes: article.readingMinutes,
   }));
   return (
-    <main id="main-content" className="archive-page">
+    <main
+      id="main-content"
+      className="archive-page"
+      data-status-component="articles"
+    >
       <section className="page-heading container">
         <HeroArtwork layers={false} />
         <p className="eyebrow">慢慢积累，常常回看</p>

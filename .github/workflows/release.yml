@@ -78,8 +78,22 @@ jobs:
         if: always()
         run: docker compose down --volumes --remove-orphans
 
+  check-status:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Verify independent status Worker without cloud credentials
+        run: |
+          docker run --rm --volume "$PWD:/workspace" --workdir /workspace/status \
+            --env CI=true --env WRANGLER_SEND_METRICS=false \
+            node:24-bookworm-slim@sha256:2fe369e969550cde8e867afc3fe370b260140cab4a23d467074295b42163d553 \
+            sh -c 'npm ci --no-audit --no-fund && npm run check && npx wrangler deploy --dry-run --outdir ../tmp/status-worker-build'
+
   publish:
-    needs: check
+    needs: [check, check-status]
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && vars.SITE_URL != ''
     runs-on: ubuntu-24.04
     timeout-minutes: 30

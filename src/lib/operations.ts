@@ -1,6 +1,7 @@
 import "server-only";
 import { open } from "node:fs/promises";
 import path from "node:path";
+import type { OperationsReport } from "./operations-types";
 
 const checkIds = [
   "containers",
@@ -22,7 +23,10 @@ const isoDate = (value: unknown): value is string =>
   /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(value) &&
   Number.isFinite(Date.parse(value));
 
-export function parseOperations(value: unknown, now = Date.now()) {
+export function parseOperations(
+  value: unknown,
+  now = Date.now(),
+): OperationsReport {
   if (
     !record(value) ||
     value.version !== 1 ||
@@ -85,7 +89,7 @@ export function parseOperations(value: unknown, now = Date.now()) {
   };
 }
 
-export async function readOperations() {
+export async function readOperations(): Promise<OperationsReport> {
   const directory =
     process.env.OPERATIONS_STATUS_DIR ||
     path.join(process.cwd(), ".deploy", "blog-dev", "operations");

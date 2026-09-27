@@ -114,6 +114,12 @@ bash scripts/ops/restore.sh backups/world-blog/<备份>.dump --into blog_recover
 GET /api/admin/operations
 ```
 
-返回 `status`、`checkedAt`、`checks` 和 `events`。访客为 401，普通用户为 403，响应始终为私有且不可缓存。网页容器只读挂载经过整理的报告目录，无法读取原始运维状态或备份。此阶段不新增管理 TAB、不发送邮件或 Webhook；后续可以直接使用这个接口接入管理界面。
+返回 `status`、`checkedAt`、`checks` 和 `events`。访客为 401，普通用户为 403，响应始终为私有且不可缓存。网页容器只读挂载经过整理的报告目录，无法读取原始运维状态或备份。
+
+管理中心的「运行状态」TAB 展示六项检查、最近检查时间、告警与恢复事件。初次进入显示骨架屏，随后每 30 秒刷新一次，页面隐藏时暂停请求，也可手动刷新。报告超过 5 分钟会明确显示过期；未初始化和请求失败均不会显示为健康。状态页只读取报告，不触发备份、恢复或服务器维护操作。没有接入邮件或 Webhook 通知。
+
+若此前只启用了每日备份，需执行本文件开头的 `bash scripts/ops/setup-operations.sh --install` 启用每分钟巡检。它会保留已有 `.env.ops`，包括已配置的 7 天保留、至少 3 组和自动清理策略。
+
+独立公开状态站、主站入口和故障跳转见 [STATUS.md](STATUS.md)。公开站仅保存访问检查结果，不读取管理员报告、服务器磁盘信息或备份文件。
 
 参考：[Nginx 限流模块](https://nginx.org/en/docs/http/ngx_http_limit_req_module.html)。

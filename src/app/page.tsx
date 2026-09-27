@@ -17,7 +17,7 @@ export default async function Home() {
     .filter((article) => article.id !== featured?.id)
     .slice(0, 3);
   return (
-    <main id="main-content">
+    <main id="main-content" data-status-component="website">
       <section className="home-hero container">
         <HeroArtwork />
         <p className="eyebrow">技术笔记</p>

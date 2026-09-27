@@ -70,7 +70,11 @@ export function SearchContent({
   }
 
   return (
-    <main id="main-content" className="search-page">
+    <main
+      id="main-content"
+      className="search-page"
+      data-status-component="search"
+    >
       <section className="page-heading container">
         <p className="eyebrow">带着问题来</p>
         <h1>找一点启发。</h1>

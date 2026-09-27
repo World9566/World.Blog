@@ -1,0 +1,8 @@
+/style.css
+  Cache-Control: public, max-age=300
+  X-Content-Type-Options: nosniff
+/page.js
+  Cache-Control: public, max-age=300
+  X-Content-Type-Options: nosniff
+/icon.svg
+  Cache-Control: public, max-age=86400

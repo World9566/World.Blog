@@ -30,6 +30,7 @@ src/generated
 content
 build-info.json
 node_modules
+**/node_modules
 .next
 out
 build
@@ -37,6 +38,12 @@ tmp
 temp
 dist
 .cache
+.wrangler
+**/.wrangler
+.dev.vars
+.dev.vars.*
+**/.dev.vars
+**/.dev.vars.*
 .pnpm-store
 logs
 coverage

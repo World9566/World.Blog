@@ -1,0 +1,15 @@
+{
+  "name": "world-blog-status",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node check-runtime.mjs",
+    "dev": "wrangler dev --test-scheduled --host 127.0.0.1",
+    "deploy": "wrangler deploy",
+    "db:local": "wrangler d1 migrations apply world-blog-status --local",
+    "db:remote": "wrangler d1 migrations apply world-blog-status --remote"
+  },
+  "devDependencies": {
+    "wrangler": "4.141.0"
+  }
+}

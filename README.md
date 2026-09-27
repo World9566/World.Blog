@@ -2,7 +2,9 @@
 
 World 是 world9566 的技术博客，基于 Next.js、MDX、PostgreSQL 和 Meilisearch。支持文章与专题、全文搜索、代码复制、链接分享、RSS 和站点地图。
 
-读者通过 GitHub 登录后，可以评论、回复、点赞、收藏和管理个人资料。管理员可以管理用户、审核评论并查看操作记录。文章使用 MDX 编写在独立内容仓库中，推送即经 SSH 以原子切换发布，无需重建应用镜像；生产服务由 Docker Compose 管理，并通过 Cloudflare Tunnel 接入。
+读者通过 GitHub 登录后，可以评论、回复、点赞、收藏和管理个人资料。管理员可以管理用户、审核评论、查看操作记录和运行状态。文章使用 MDX 编写在独立内容仓库中，推送即经 SSH 以原子切换发布，无需重建应用镜像；生产服务由 Docker Compose 管理，并通过 Cloudflare Tunnel 接入。
+
+`status/` 提供独立的公开状态站，部署在 Cloudflare Workers，使用 D1 保存访问检查及故障记录。主站页脚有「网站状态」入口，启用边缘路由后可在源站故障时跳转。首次部署和路由配置见 [STATUS.md](STATUS.md)。
 
 ## 环境
 
@@ -271,6 +273,7 @@ src/mdx-components.tsx     MDX 组件入口
 prisma/                   Prisma schema 与数据库迁移
 scripts/                  内容校验、搜索同步、发布与环境检查
 tests/                    内容、账号和社区输入边界测试
+status/                   独立状态站、边缘故障跳转与 D1 迁移
 .devcontainer/            VS Code 容器开发配置
 compose.yaml              本地服务编排
 compose.ci.yaml           CI 测试环境覆盖配置
@@ -353,4 +356,4 @@ bash scripts/ops/restore.sh backups/world-blog/<备份>.dump --into blog_recover
 
 `deploy/world-blog-backup.service` 和 `.timer` 提供每日备份模板，启用前检查其中的用户、路径、sudo 权限和服务器时区。CI 使用 `scripts/check-production.sh` 在独立容器中验证生产启动、HTTP 与备份恢复，不操作正式数据库。
 
-公开读取限流随生产网关部署生效。本地备份与故障巡检通过 `scripts/ops/setup-operations.sh` 生成当前部署用户对应的 systemd 配置，确认后加 `--install` 启用。告警仅记录在本地，管理员可通过 `/api/admin/operations` 读取状态和最近事件；本阶段没有外部通知。
+公开读取限流随生产网关部署生效。本地备份与故障巡检通过 `scripts/ops/setup-operations.sh` 生成当前部署用户对应的 systemd 配置，加 `--install` 启用。告警记录在本地，管理员可在管理中心「运行状态」或通过 `/api/admin/operations` 查看；没有外部通知。公开状态站独立部署，不随主站 Docker 发布自动上线。

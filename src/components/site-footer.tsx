@@ -17,6 +17,7 @@ export function SiteFooter() {
             <Link href="/articles">全部文章</Link>
             <Link href="/topics">浏览专题</Link>
             <Link href="/feed.xml">RSS 订阅</Link>
+            <a href={site.status}>网站状态</a>
             <a href={site.github} target="_blank" rel="noopener noreferrer">
               GitHub <Icon name="external" width="14" height="14" />
             </a>

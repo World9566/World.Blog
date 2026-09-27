@@ -4,6 +4,7 @@ export const site = {
   description: "从代码到原理，记录值得弄明白的技术问题。",
   author: "world9566",
   github: "https://github.com/World9566",
+  status: "https://status.world9566.online",
 };
 
 const dateFormatter = new Intl.DateTimeFormat("zh-CN", {
