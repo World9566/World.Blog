@@ -42,6 +42,7 @@ Desktop.ini
 .env.*
 !/.env.example
 !/.env.production.example
+!/.env.ops.example
 .npmrc
 .pnpmrc
 .netrc

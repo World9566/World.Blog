@@ -52,6 +52,8 @@ STATE_DIR="$ROOT/.deploy/$COMPOSE_PROJECT_NAME"
 BACKUP_DIR="$ROOT/backups/$COMPOSE_PROJECT_NAME"
 umask 077
 mkdir -p "$STATE_DIR" "$BACKUP_DIR"
+mkdir -p "$STATE_DIR/operations"
+chmod 755 "$STATE_DIR/operations"
 if [[ "$inherited_release" =~ ^[a-f0-9]{40}$ ]]; then
   # Nested scripts must select the caller's release, not the recorded one.
   export BLOG_RELEASE=$inherited_release

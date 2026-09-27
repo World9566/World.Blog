@@ -285,7 +285,7 @@ deploy/                   代理配置与备份定时器模板
 
 提交源码、依赖锁文件、数据库迁移、测试、容器配置和维护脚本。测试是 CI 检查的一部分，迁移是初始化及升级数据库的必要文件。文章与内容历史属于独立的内容仓库，本仓库的 `content/` 只是本地开发 clone，不提交。
 
-真实 `.env`、密钥、数据库备份、日志、依赖目录、构建产物、生成代码、编辑器配置与本地设计记录均被忽略。只提交 `.env.example` 和 `.env.production.example` 两个空凭据模板；正式域名和公开作者署名可以保留在仓库中。
+真实 `.env`、密钥、数据库备份、日志、依赖目录、构建产物、生成代码、编辑器配置与本地设计记录均被忽略。只提交 `.env.example`、`.env.production.example` 和 `.env.ops.example` 三个不含凭据的配置模板；正式域名和公开作者署名可以保留在仓库中。
 
 在首次推送前创建一个空 GitHub 仓库，然后配置自己的远程地址：
 
@@ -347,8 +347,10 @@ bash scripts/ops/backup.sh
 bash scripts/ops/restore.sh backups/world-blog/<备份>.dump --into blog_recovered
 ```
 
-备份包含数据库归档、校验文件、版本元数据和 `.dump.env` 私有配置副本，权限为 `600`。配置副本含真实凭据，需要加密保存到服务器之外；`BETTER_AUTH_SECRET` 是恢复已有 OAuth 加密记录的必要信息。脚本不自动上传或删除历史备份。
+备份包含数据库归档、校验文件、版本元数据、当前内容快照和 `.dump.env` 私有配置副本，权限为 `600`。`BETTER_AUTH_SECRET` 是恢复已有 OAuth 加密记录的必要信息。目前采用本地备份，不上传；清理保留策略默认只预览，自动清理需明确启用。完整备份、恢复演练、限流与告警配置见 [OPERATIONS.md](OPERATIONS.md)。
 
 恢复先写入一个不存在的新库，保留当前数据库。验证数据后，停止入口和应用，另外备份当前库；将 `.env.production` 的 `POSTGRES_DB` 切到新库并恢复备份对应的认证密钥，保留当前数据库密码和有效 OAuth 配置。把 `.deploy/world-blog/current-release` 设置为备份元数据中的有效版本，重新加载 `common.sh`，检查维护镜像配置、同步搜索，再启动 web 和 gateway。不要直接向恢复库运行新版本迁移。
 
 `deploy/world-blog-backup.service` 和 `.timer` 提供每日备份模板，启用前检查其中的用户、路径、sudo 权限和服务器时区。CI 使用 `scripts/check-production.sh` 在独立容器中验证生产启动、HTTP 与备份恢复，不操作正式数据库。
+
+公开读取限流随生产网关部署生效。本地备份与故障巡检通过 `scripts/ops/setup-operations.sh` 生成当前部署用户对应的 systemd 配置，确认后加 `--install` 启用。告警仅记录在本地，管理员可通过 `/api/admin/operations` 读取状态和最近事件；本阶段没有外部通知。

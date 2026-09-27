@@ -57,7 +57,15 @@ trap cleanup EXIT
 echo 'Compose release selection survives cleared environment; failure cleanup passed.'
 "${DOCKER[@]}" build --target runner --build-arg SITE_URL="$SITE_URL" --build-arg REVISION="$revision" --tag "$BLOG_IMAGE:$revision" "$(host_path "$ROOT")"
 "${DOCKER[@]}" build --target ops --build-arg SITE_URL="$SITE_URL" --build-arg REVISION="$revision" --tag "$BLOG_IMAGE:$revision-ops" "$(host_path "$ROOT")"
-dc pull postgres meilisearch gateway
+if [[ "${BLOG_REHEARSAL_SKIP_PULL:-0}" != 1 ]]; then
+  dc pull postgres meilisearch gateway
+else
+  # Local rehearsal can reuse installed infrastructure images when the
+  # registry is slow. CI and production deployment retain their pull behavior.
+  for image in "${POSTGRES_IMAGE:-postgres:18.6-bookworm}" "${MEILI_IMAGE:-getmeili/meilisearch:v1.53.2}" "${GATEWAY_IMAGE:-nginx:1.28.2-alpine}"; do
+    "${DOCKER[@]}" image inspect "$image" >/dev/null
+  done
+fi
 BLOG_SKIP_PULL=1 bash scripts/ops/deploy.sh "$revision"
 dc run -T --rm --no-deps ops node --input-type=module < scripts/check-production.mjs
 dc run --rm --no-deps -e CHECK_BASE_URL=http://gateway:8080 ops pnpm content:check
@@ -136,4 +144,9 @@ restored=$(dc exec -T postgres psql -U blog -d blog_recovery_check -Atc 'SELECT 
 [[ "$restored" == backup-roundtrip ]]
 [[ "$(sql 'SELECT value FROM recovery_probe WHERE id=1;')" == backup-roundtrip ]]
 if bash scripts/ops/restore.sh "$backup" --into blog_recovery_check; then echo 'Existing database guard failed' >&2; exit 1; fi
+bash scripts/ops/restore-drill.sh "$backup"
+[[ "$(sql "SELECT count(*) FROM pg_database WHERE datname LIKE 'blog_drill_%';")" == 0 ]]
+[[ "$(sql 'SELECT value FROM recovery_probe WHERE id=1;')" == backup-roundtrip ]]
+[[ "$(readlink "$CONTENT_RELEASES_DIR/current")" == "$content_sha" ]]
+tar -xOzf "$backup.content.tar.gz" ./posts/bundle-check.mdx | grep -q 'post_bundle_check'
 echo 'Production deployment, HTTP and backup recovery checks passed. Test backups are retained under the unique project name.'

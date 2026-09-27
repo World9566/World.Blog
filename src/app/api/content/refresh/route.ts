@@ -16,7 +16,15 @@ function authorized(request: Request): boolean {
   return value.length === reference.length && timingSafeEqual(value, reference);
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  if (!authorized(request))
+    return Response.json(
+      { error: "未授权。" },
+      {
+        status: 401,
+        headers: { "Cache-Control": "no-store" },
+      },
+    );
   return Response.json(contentStatus(), {
     headers: { "Cache-Control": "no-store" },
   });

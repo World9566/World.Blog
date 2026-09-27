@@ -114,7 +114,13 @@ async function main() {
       });
       await mint(index);
     }
-    for (const section of ["overview", "users", "comments", "audit"]) {
+    for (const section of [
+      "overview",
+      "users",
+      "comments",
+      "audit",
+      "operations",
+    ]) {
       const denied = await request(`/api/admin/${section}`);
       assert.equal(denied.status, 401);
       assert.match(
@@ -123,6 +129,16 @@ async function main() {
       );
       assert.equal((await request(`/api/admin/${section}`, 2)).status, 403);
     }
+    const operations = await json("/api/admin/operations", 0);
+    assert.ok(
+      ["ok", "degraded", "stale", "unavailable"].includes(operations.status),
+    );
+    assert.deepEqual(Object.keys(operations).sort(), [
+      "checkedAt",
+      "checks",
+      "events",
+      "status",
+    ]);
     assert.equal((await request("/admin")).status, 307);
     assert.match(
       (await request("/admin")).headers.get("location") || "",

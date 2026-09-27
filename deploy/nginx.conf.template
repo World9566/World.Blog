@@ -23,12 +23,53 @@ http {
     "" $remote_addr;
     default $http_cf_connecting_ip;
   }
+  # Separate budgets across all keywords/articles for the same visitor IP.
+  # Empty keys exempt writes and unrelated routes. Shared zones span workers;
+  # nodelay below allows short bursts without slowing accepted requests.
+  map "$request_method:$uri" $search_read_key {
+    default "";
+    ~^(GET|HEAD):/search/?$ $client_ip;
+  }
+  map "$request_method:$uri" $community_read_key {
+    default "";
+    ~^(GET|HEAD):/api/articles/ $client_ip;
+  }
+  limit_req_zone $search_read_key zone=search_reads:10m rate=120r/m;
+  limit_req_zone $community_read_key zone=community_reads:10m rate=600r/m;
+  map $uri $throttle_type {
+    default application/json;
+    ~^/search/?$ "text/html; charset=utf-8";
+  }
+  map $uri $throttle_body {
+    default '{"message":"访问有些频繁，请 30 秒后重试。"}';
+    ~^/search/?$ '<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>稍后再试 - World</title><style>body{margin:0;background:#f5f5f7;color:#1d1d1f;font:17px/1.6 system-ui,sans-serif}main{max-width:36rem;margin:15vh auto;padding:32px}h1{font-size:32px}a{color:#0066cc;display:inline-block;margin:16px 24px 0 0}</style><main><h1>稍后再试。</h1><p>搜索有些频繁，请等待 30 秒后重试。</p><a href="">重新尝试</a><a href="/articles">浏览文章</a></main></html>';
+  }
+  # Requests delivered by Cloudflare never need these maintenance endpoints.
+  # Loopback/Docker probes have no CF header and retain their existing path.
+  map "$http_cf_connecting_ip:$uri" $public_maintenance {
+    default 0;
+    ~^.+:/api/(health|content/refresh)/?$ 1;
+  }
   server {
     listen 8080;
     server_name ${SITE_HOST};
     add_header X-Content-Type-Options nosniff always;
     add_header Referrer-Policy strict-origin-when-cross-origin always;
     add_header X-Frame-Options SAMEORIGIN always;
+    if ($public_maintenance) { return 404; }
+    limit_req zone=search_reads burst=60 nodelay;
+    limit_req zone=community_reads burst=120 nodelay;
+    limit_req_status 429;
+    limit_req_log_level notice;
+    error_page 429 = @throttled;
+    location @throttled {
+      default_type "";
+      add_header Content-Type $throttle_type always;
+      add_header Cache-Control "private, no-store" always;
+      add_header Retry-After 30 always;
+      add_header X-Content-Type-Options nosniff always;
+      return 429 $throttle_body;
+    }
     location = /healthz { access_log off; return 200 'ok'; }
     location / {
       set $app web:3000;

@@ -1,0 +1,11 @@
+[Unit]
+Description=World Blog health and backup monitoring
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/home/ubuntu/apps/world-blog
+ExecStart=/bin/bash scripts/ops/monitor.sh
+TimeoutStartSec=150
+UMask=0077

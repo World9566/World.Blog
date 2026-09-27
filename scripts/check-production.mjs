@@ -17,6 +17,22 @@ async function request(path, options = {}) {
 const health = await request("/api/health");
 assert.equal(health.status, 200);
 assert.match(health.headers.get("cache-control"), /no-store/);
+for (const path of ["/api/health", "/api/content/refresh"]) {
+  assert.equal(
+    (await request(path, { headers: { "CF-Connecting-IP": "192.0.2.30" } }))
+      .status,
+    404,
+  );
+}
+assert.equal((await request("/api/content/refresh")).status, 401);
+assert.equal(
+  (
+    await request("/api/content/refresh", {
+      headers: { Authorization: `Bearer ${process.env.CONTENT_REFRESH_TOKEN}` },
+    })
+  ).status,
+  200,
+);
 const home = await request("/");
 assert.equal(home.status, 200);
 assert.equal(home.headers.get("x-content-type-options"), "nosniff");
@@ -73,4 +89,60 @@ assert.ok(
 );
 console.log(
   "Production HTTP checks passed: assets, origin, proxy headers, private routes, OAuth callback and secure cookies.",
+);
+
+// A distinct documentation IP isolates these counters from the rest of CI.
+const burst = async (path, ip, count) =>
+  Promise.all(
+    Array.from({ length: count }, (_, i) =>
+      request(`${path}?probe=${i}`, {
+        // Untrusted forwarding headers rotate, but the verified CF source
+        // remains fixed. They must not split one visitor into many budgets.
+        headers: {
+          "CF-Connecting-IP": ip,
+          "X-Real-IP": `192.0.3.${i + 1}`,
+          "X-Forwarded-For": `192.0.4.${i + 1}`,
+        },
+      }),
+    ),
+  );
+const searchBurst = await burst("/search", "192.0.2.40", 90);
+const searchLimited = searchBurst.find((response) => response.status === 429);
+assert.ok(searchLimited, "Search flood is limited before reaching Next.js");
+assert.equal(searchLimited.headers.get("retry-after"), "30");
+assert.match(searchLimited.headers.get("content-type"), /text\/html/);
+assert.match(await searchLimited.text(), /稍后再试/);
+assert.equal(
+  (await request("/search", { headers: { "CF-Connecting-IP": "192.0.2.41" } }))
+    .status,
+  200,
+);
+const commentBurst = await burst(
+  "/api/articles/missing/community",
+  "192.0.2.42",
+  160,
+);
+const commentLimited = commentBurst.find((response) => response.status === 429);
+assert.ok(commentLimited, "Public comment reads have a separate budget");
+assert.match(commentLimited.headers.get("cache-control"), /no-store/);
+assert.match((await commentLimited.json()).message, /30/);
+// Do not require the next individual read to be rejected: the leaky bucket
+// replenishes while accepted upstream requests finish. The burst above proves
+// that rotating the untrusted headers cannot bypass the shared counter.
+assert.equal(
+  (
+    await request("/api/articles/missing/community", {
+      method: "PUT",
+      headers: { "CF-Connecting-IP": "192.0.2.42" },
+    })
+  ).status,
+  404,
+);
+assert.equal(
+  (await request("/", { headers: { "CF-Connecting-IP": "192.0.2.42" } }))
+    .status,
+  200,
+);
+console.log(
+  "Gateway checks passed: read limits, independent IP budgets, write exclusion and internal endpoint protection.",
 );

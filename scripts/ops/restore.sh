@@ -6,7 +6,12 @@ destination=$3
 source "$(dirname -- "$0")/common.sh"
 [[ -f "$file" && -f "$file.sha256" && -f "$file.meta" ]] || { echo 'Backup, checksum and metadata are required.' >&2; exit 1; }
 [[ "$(sha256sum "$file" | cut -d ' ' -f 1)" == "$(cut -d ' ' -f 1 "$file.sha256")" ]] || { echo 'Backup checksum mismatch.' >&2; exit 1; }
-lock_operation
+for suffix in meta env; do
+  if [[ -f "$file.$suffix.sha256" ]]; then
+    [[ "$(sha256sum "$file.$suffix" | cut -d ' ' -f 1)" == "$(cut -d ' ' -f 1 "$file.$suffix.sha256")" ]] || { echo 'Backup configuration or metadata checksum mismatch.' >&2; exit 1; }
+  fi
+done
+[[ "${BLOG_OPERATION_LOCK_HELD:-0}" == 1 ]] || lock_operation
 dc exec -T postgres pg_restore --list < "$file" >/dev/null
 [[ "$(sql "SELECT count(*) FROM pg_database WHERE datname = '$destination';")" == 0 ]] || { echo 'Destination database already exists; nothing was changed.' >&2; exit 1; }
 # An empty destination avoids retaining objects from later migrations.

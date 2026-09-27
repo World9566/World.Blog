@@ -22,7 +22,10 @@ export async function communityFetch<T>(
   const result = await response.json().catch(() => null);
   if (!response.ok || !result)
     throw new CommunityRequestError(
-      result?.message || "暂时无法加载，请稍后重试。",
+      result?.message ||
+        (response.status === 429
+          ? "访问有些频繁，请稍后重试。"
+          : "暂时无法加载，请稍后重试。"),
       response.status,
     );
   return result as T;

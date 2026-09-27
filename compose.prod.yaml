@@ -25,6 +25,7 @@ x-app-environment: &app-environment
   GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:?Set GITHUB_CLIENT_SECRET}
   TRUST_PROXY: "1"
   APP_REVISION: ${BLOG_RELEASE:?Set BLOG_RELEASE}
+  OPERATIONS_STATUS_DIR: /operations
 
 services:
   web:
@@ -40,6 +41,7 @@ services:
       - ${CONTENT_ROOT:?Set CONTENT_ROOT}/releases:/content:ro
       # A writable bind mount is valid inside a read-only root filesystem.
       - ${CONTENT_ROOT:?Set CONTENT_ROOT}/cache:/app/.content-cache
+      - ./.deploy/${COMPOSE_PROJECT_NAME:-world-blog}/operations:/operations:ro
     read_only: true
     tmpfs:
       - /tmp:uid=1000,gid=1000,mode=1777
